@@ -1,0 +1,147 @@
+{
+  "skill_name": "project-migration",
+  "focus": "frontend-project-migration",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "把旧 Vue 2 项目的订单列表页迁到现有 React 项目，功能和页面样式要跟原来一致",
+        "top_k": 1
+      },
+      {
+        "prompt": "将 CRA 项目迁移到 Vite，保留环境变量、代理、SVG、测试和生产部署行为",
+        "top_k": 1
+      },
+      {
+        "prompt": "把 Angular 用户中心模块迁入 Next.js App Router，并保留权限、deep link 和响应式",
+        "top_k": 1
+      },
+      {
+        "prompt": "将 MUI 页面逐步迁到目标项目的 Design System，不允许视觉和键盘交互回归",
+        "top_k": 3
+      },
+      {
+        "prompt": "把单体前端中的结算功能拆成可独立发布的微前端，并设计灰度和回滚",
+        "top_k": 3
+      },
+      {
+        "prompt": "把 Redux Form 迁到 React Hook Form，同时保持校验时机、dirty 状态和错误提示",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "优化订单数据库的慢 SQL 和索引",
+        "owner": "database-performance"
+      },
+      {
+        "prompt": "从零设计一个新的营销落地页，不需要参考旧项目",
+        "owner": "frontend-ui-engineering"
+      },
+      {
+        "prompt": "修一下按钮右边距 4px 的问题",
+        "owner": "frontend-bugfix"
+      },
+      {
+        "prompt": "把 Kafka 消费者从 Java 迁到 Go",
+        "owner": "backend-project-migration"
+      },
+      {
+        "prompt": "审查这个 React 组件有没有性能问题",
+        "owner": "react-performance-review"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": "vue-to-react-route-slice",
+      "prompt": "源项目是 Vue 2，目标项目是 React。请把订单列表模块迁过去，包括筛选、分页、权限、Loading/Empty/Error、移动端和视觉对齐。",
+      "expected_output": "先研究源和目标项目，再按页面垂直切片建立生命周期、迁移清单、视觉基线、目标蓝图、试迁移与多维验证，而不是逐个翻译 .vue 文件。",
+      "expectations": [
+        "识别为 Slice，主模式为页面/功能切片，次模式至少包含框架、Router、State/Data 和 Styling",
+        "检查 Route、Menu、deep link、权限、Feature Flag 和被注释/替代能力",
+        "对 Active、Conditional、Deprecated、Removed 和 Unknown 做显式处理",
+        "未经批准不 redesign，并覆盖 Loading、Empty、Error、长内容和代表 viewport",
+        "从目标 React 项目中选择真实范例决定组件、状态、请求、样式和测试结构",
+        "先做代表性垂直试迁移，不按源组件树或文件一对一转换",
+        "验证包含功能、console/network、visual、keyboard/focus、Accessibility 和旧依赖残留"
+      ],
+      "anti_expectations": [
+        "直接生成 Vue-to-React 文件映射清单并批量改写",
+        "只运行 build 和 unit test 就声明完成",
+        "把被注释或 Removed 的旧功能默认恢复"
+      ]
+    },
+    {
+      "id": "cra-to-vite-build-migration",
+      "prompt": "把这个 CRA 应用迁移到 Vite。开发环境已经能启动，但需要确保生产部署不出问题。",
+      "expected_output": "识别为 Bundler/Runtime 迁移，盘点并验证 entry、HTML、env、asset、alias、proxy、特殊 loader、测试、CI 和生产 base path，而不是只替换 scripts。",
+      "expectations": [
+        "读取 package.json、lockfile、CRA 配置覆盖、环境变量、public 目录和部署配置",
+        "检查 SVG、worker、WASM、CSS preprocessors、alias、proxy 和 code splitting 等特殊路径",
+        "使用现有 package manager，避免无故重写 lockfile",
+        "验证 dev、test、production build、preview、CI 和部署资源路径",
+        "扫描 react-scripts、旧 env prefix、webpack loader 和旧配置残留",
+        "把“开发服务器能启动”视为不足证据"
+      ],
+      "anti_expectations": [
+        "只修改 package.json 和新增 vite.config",
+        "忽略生产 public path、静态资源和 CI",
+        "在没有证据时声称包体或性能一定提升"
+      ]
+    },
+    {
+      "id": "design-system-migration",
+      "prompt": "将后台系统从 MUI 迁到公司 Design System。按钮、表单、表格和弹窗外观不能明显变化。",
+      "expected_output": "建立组件状态矩阵、Token 映射和页面级视觉裁判，验证 overlay、focus、响应式与 Accessibility，并以小页面切片试迁移后再扩大。",
+      "expectations": [
+        "比较组件可观察语义而不是只比较组件名称",
+        "覆盖 hover、focus、disabled、loading、validation、portal、z-index、scroll lock 和 dialog focus restore",
+        "记录 typography、spacing、radius、icon、density 和 theme Token 映射",
+        "固定 browser、font、viewport、locale、fixture、time 和 animation 后执行 visual regression",
+        "视觉差异分为修复、批准、环境噪声和 Unknown",
+        "禁止通过扩大截图阈值掩盖回归",
+        "扫描 MUI import、旧 theme、旧 CSS override 和兼容 adapter 残留"
+      ],
+      "anti_expectations": [
+        "全仓库直接替换组件 import",
+        "认为同名 Button、Dialog 或 Table 自动等价",
+        "只检查默认态和桌面 viewport"
+      ]
+    },
+    {
+      "id": "runtime-unavailable",
+      "prompt": "源项目现在跑不起来，但代码和旧 Storybook 截图还在。请规划迁移到目标项目。",
+      "expected_output": "明确运行时证据受限，使用 Storybook、测试、DOM/CSS、路由和代码作为降级证据，标记置信度和 Unknown，不伪造视觉/行为结论。",
+      "expectations": [
+        "选择运行时不可用的证据模式并降低结论置信度",
+        "优先修复最小可运行基线或使用 Storybook/测试建立裁判",
+        "把无法确认的权限、条件功能、交互和响应式行为标记为 Unknown",
+        "在没有可靠裁判时限制批量实施，先做 checkpoint",
+        "说明哪些结论来自 observed、reported、inferred 或 unknown"
+      ],
+      "anti_expectations": [
+        "仅根据组件文件推断产品完整行为",
+        "把旧截图当成所有状态和 viewport 的充分证据",
+        "在源项目无法运行时仍声称视觉完全一致"
+      ]
+    },
+    {
+      "id": "microfrontend-program",
+      "prompt": "把单体后台的订单和结算拆成两个微前端，由不同团队独立发布。",
+      "expected_output": "识别为 Program，按业务能力而不是目录拆 Workstreams，定义宿主边界、共享契约、版本策略、失败隔离、灰度、回滚和旧桥接层退休条件。",
+      "expectations": [
+        "识别共享 Route、auth、session、locale、theme、analytics、runtime 和依赖版本",
+        "避免跨微前端共享隐式可变 Store",
+        "验证独立开发、构建、部署、宿主加载、超时和失败降级",
+        "明确 framework/runtime singleton 和 version skew 策略",
+        "设计 feature flag/canary/dual route、监控和回滚",
+        "按订单和结算等稳定业务能力分配所有权，不按 components/utils 目录分工"
+      ],
+      "anti_expectations": [
+        "仅按目录边界拆包",
+        "把临时 event bus 当作永久领域模型",
+        "没有独立发布和回滚证据就声明拆分完成"
+      ]
+    }
+  ]
+}
