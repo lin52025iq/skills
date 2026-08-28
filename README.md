@@ -1,52 +1,40 @@
-# 项目迁移 Skill
+# 前端项目迁移 Skill
 
-这是一个面向 AI 编程代理的系统迁移 Skill，用于将一个项目中的功能、模块、业务域或完整能力迁移到另一个项目，并支持跨语言、跨框架、跨数据库、跨架构以及遗留系统现代化。
+`project-migration` 是一个面向 AI 编程代理的**前端项目迁移与现代化 Skill**，用于把已有前端项目中的页面、功能模块和用户体验迁移到新的前端项目，并支持 React、Vue、Angular、Svelte、JavaScript / TypeScript、SPA / SSR、微前端、状态管理、组件库和样式体系之间的迁移。
 
-当前版本的目标不只是“把代码逻辑搬过去”，而是同时完成两件事：
-
-- **迁移正确**：业务能力、规则、接口、数据、副作用和失败语义得到可验证的延续；
-- **目标代码更好**：不机械复制源项目中已确认的错误设计和技术债，目标实现应符合目标项目与目标技术栈的成熟实践，结构更清晰、更容易测试和继续演进。
-
-核心工作方式：
+它不把迁移理解成“把旧组件换一种语法复制过去”。默认工作方式是：
 
 ```text
-Research 源系统真实行为
-→ 蒸馏为技术无关的迁移语义规格
-→ Review 目标项目语言、架构、范例和可复用能力
-→ 形成目标实现蓝图
-→ 按目标项目方式 Rebuild
-→ 行为与质量验证
-```
-
-对于大模块，可以进一步采用：
-
-```text
-Supervisor
-→ 按独立业务能力拆分 Workstreams
-→ 多个 Subagent / Agent Team / 独立对话并行处理
-→ 独立 Reviewer
-→ Supervisor 统一集成与 Gate
+研究源前端真实入口
+→ 识别现役 / 隐藏 / 禁用 / 废弃功能
+→ 递归下钻生成功能文档
+→ 建立页面视觉、响应式和交互基线
+→ 蒸馏技术无关的迁移语义
+→ 研究目标前端项目架构与惯例
+→ 形成目标原生页面 / 模块蓝图
+→ Rebuild
+→ 功能 + 视觉 + 交互 + Accessibility 验收
 ```
 
 核心原则：
 
-- 不把源文件、类、函数列表直接变成目标迁移任务；
-- 源代码主要用于回答“旧系统真实做什么”，目标代码结构由迁移语义规格、目标项目画像和目标实现蓝图决定；
-- 优先研究目标项目中真实、稳定、测试充分的模块，采用目标语言和框架的惯用方式；
-- 重要结论区分“证据、推断、未知”，禁止把推断伪装成事实；
-- 迁移开始前允许得出“局部迁移、先解耦、暂缓或不迁移”的结论；
-- 大规模实施前先建立可验证旧、新实现的裁判，并通过可丢弃试迁移压力测试规则和目标设计；
-- 保留业务语义，但允许对错误边界、过度耦合、框架侵入、重复逻辑、隐式副作用等设计问题做受控现代化；
-- 大模块按独立工作流而不是文件数量拆分，多 Agent 间通过工作包、所有权和交接协议协作；
-- 默认采用增量迁移，每个迁移单元可验证、可审查、必要时可回滚；
-- Skill 的工作语言始终为中文。
+- **代码存在不等于功能需要迁移**：必须检查被注释的 JSX / Template、未注册 Route、隐藏 Menu、Feature Flag、Permission、CSS hidden、替代实现和废弃证据。
+- **未经批准不做 redesign**：目标内部实现可以重建，但现役页面的布局、样式、响应式和交互默认跟随源项目对齐。
+- **先建立视觉基线再迁移页面**：关键页面要记录 viewport、Page Shell、Grid / Flex、spacing、字体、颜色、Icon、Loading / Empty / Error 等状态。
+- **目标前端项目决定代码形状**：优先复用目标项目已有 Router、State、API Client、组件库、Design System、Styling 和测试方式。
+- **禁止源结构一对一翻译**：不默认执行 `.vue → .tsx`、旧 Component → 新 Component、旧 Store → 新 Store、旧 CSS → 新 CSS 的机械映射。
+- **视觉和功能都是验收条件**：Build 成功、页面能打开、API 能调用，都不能单独代表迁移完成。
+- **大模块支持 Supervisor + Workstreams**：可以按页面能力、视觉基线、状态模型、数据层和独立验收拆给多个子 Agent / Agent Team / 独立对话。
+- Skill 工作语言始终为中文。
 
 入口：[`project-migration/SKILL.md`](project-migration/SKILL.md)
 
-方法论：[`project-migration/references/00-项目迁移方法论.md`](project-migration/references/00-项目迁移方法论.md)
+前端视觉与交互：[`project-migration/references/15-前端视觉与交互还原.md`](project-migration/references/15-前端视觉与交互还原.md)
+
+功能生命周期：[`project-migration/references/14-功能生命周期与废弃识别.md`](project-migration/references/14-功能生命周期与废弃识别.md)
+
+功能递归理解：[`project-migration/references/13-功能文档与递归下钻.md`](project-migration/references/13-功能文档与递归下钻.md)
 
 目标原生重建：[`project-migration/references/11-目标原生重建.md`](project-migration/references/11-目标原生重建.md)
 
 多 Agent / 多会话编排：[`project-migration/references/12-多Agent与多会话编排.md`](project-migration/references/12-多Agent与多会话编排.md)
-
-设计现代化：[`project-migration/references/09-设计现代化与代码质量.md`](project-migration/references/09-设计现代化与代码质量.md)
