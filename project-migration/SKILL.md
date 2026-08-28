@@ -409,7 +409,7 @@ Agent 数量由**独立工作流数量**决定，不由文件数量决定。
 
 ### 10.2 Worker 启动前必须有工作包
 
-使用 `templates/子Agent工作包.md`。
+使用 `templates/17-子Agent工作包.md`。
 
 Worker 不能只拿一句“你去迁订单模块”。
 
@@ -532,14 +532,14 @@ Worker 若发现全局错误，提出：
 
 跨技术栈或不同项目迁移时优先使用：
 
-- `templates/迁移语义规格.md`；
-- `templates/目标项目画像.md`；
-- `templates/目标实现蓝图.md`。
+- `templates/05-迁移语义规格.md`；
+- `templates/10-目标项目画像.md`；
+- `templates/12-目标实现蓝图.md`。
 
 大模块、多 Agent 或多对话时使用：
 
-- `templates/多Agent编排总览.md`；
-- `templates/子Agent工作包.md`；
-- `templates/子Agent交接.md`。
+- `templates/16-多Agent编排总览.md`；
+- `templates/17-子Agent工作包.md`；
+- `templates/18-子Agent交接.md`。
 
 模板用于统一事实和状态，不要求机械填满所有字段。
