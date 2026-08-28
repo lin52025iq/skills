@@ -1,40 +1,79 @@
 # 前端项目迁移 Skill
 
-`project-migration` 是一个面向 AI 编程代理的**前端项目迁移与现代化 Skill**，用于把已有前端项目中的页面、功能模块和用户体验迁移到新的前端项目，并支持 React、Vue、Angular、Svelte、JavaScript / TypeScript、SPA / SSR、微前端、状态管理、组件库和样式体系之间的迁移。
+`project-migration` 是一个面向 AI 编程代理的前端迁移 Skill，用于把已有页面、Feature 和用户体验迁移到新的前端项目或技术栈，并用可复现证据判断迁移是否完整。
 
-它不把迁移理解成“把旧组件换一种语法复制过去”。默认工作方式是：
+适用场景包括：
+
+- Vue / React / Angular / Svelte 之间迁移；
+- JavaScript → TypeScript；
+- Webpack → Vite / Rspack；
+- SPA → SSR、文件路由或微前端；
+- Router、State、Data Fetching、Form、组件库、Design System 和 Styling 替换；
+- 页面或 Feature 跨仓库迁移；
+- 迁移后的功能、视觉、交互、响应式、Accessibility 和运行质量验收。
+
+核心工作方式：
 
 ```text
-研究源前端真实入口
-→ 识别现役 / 隐藏 / 禁用 / 废弃功能
-→ 递归下钻生成功能文档
-→ 建立页面视觉、响应式和交互基线
-→ 蒸馏技术无关的迁移语义
-→ 研究目标前端项目架构与惯例
-→ 形成目标原生页面 / 模块蓝图
-→ Rebuild
-→ 功能 + 视觉 + 交互 + Accessibility 验收
+确认真实迁移前状态
+→ 自动盘点源与目标前端
+→ 识别现役 / 条件 / 隐藏 / 废弃能力
+→ 固化功能、视觉与交互基线
+→ 按目标项目惯例设计目标原生蓝图
+→ 试迁移与分波实施
+→ 功能 + 视觉 + 交互 + 响应式 + Accessibility 对照
+→ 发布、回滚与旧路径清理
 ```
 
-核心原则：
+## 关键原则
 
-- **代码存在不等于功能需要迁移**：必须检查被注释的 JSX / Template、未注册 Route、隐藏 Menu、Feature Flag、Permission、CSS hidden、替代实现和废弃证据。
-- **未经批准不做 redesign**：目标内部实现可以重建，但现役页面的布局、样式、响应式和交互默认跟随源项目对齐。
-- **先建立视觉基线再迁移页面**：关键页面要记录 viewport、Page Shell、Grid / Flex、spacing、字体、颜色、Icon、Loading / Empty / Error 等状态。
-- **目标前端项目决定代码形状**：优先复用目标项目已有 Router、State、API Client、组件库、Design System、Styling 和测试方式。
-- **禁止源结构一对一翻译**：不默认执行 `.vue → .tsx`、旧 Component → 新 Component、旧 Store → 新 Store、旧 CSS → 新 CSS 的机械映射。
-- **视觉和功能都是验收条件**：Build 成功、页面能打开、API 能调用，都不能单独代表迁移完成。
-- **大模块支持 Supervisor + Workstreams**：可以按页面能力、视觉基线、状态模型、数据层和独立验收拆给多个子 Agent / Agent Team / 独立对话。
-- Skill 工作语言始终为中文。
+- **先确认 before state**：依赖或配置已被升级时，不能把当前工作树当作迁移前基线。
+- **迁移用户契约，不迁移源组件树**：保持现役能力与体验，按目标项目方式重建代码。
+- **代码存在不等于需要迁移**：注释、隐藏、Flag、权限、替代实现和废弃证据必须结合判断。
+- **未经批准不 redesign**：代码结构可以现代化，页面视觉与交互默认跟随现役基线。
+- **自动化负责重复事实，模型负责语义判断**：盘点与差异比较使用确定性脚本，生命周期和产品取舍保留证据。
+- **小任务走轻量路径，大项目才启用完整 Workstreams**：不机械生成大量空文档。
+- **Build 通过不是完成条件**：最终结论必须附带功能、视觉、交互、响应式和质量证据。
 
-入口：[`project-migration/SKILL.md`](project-migration/SKILL.md)
+## 快速入口
 
-前端视觉与交互：[`project-migration/references/15-前端视觉与交互还原.md`](project-migration/references/15-前端视觉与交互还原.md)
+主 Skill：[`project-migration/SKILL.md`](project-migration/SKILL.md)
 
-功能生命周期：[`project-migration/references/14-功能生命周期与废弃识别.md`](project-migration/references/14-功能生命周期与废弃识别.md)
+最小迁移包：[`project-migration/templates/00-最小前端迁移包.md`](project-migration/templates/00-最小前端迁移包.md)
 
-功能递归理解：[`project-migration/references/13-功能文档与递归下钻.md`](project-migration/references/13-功能文档与递归下钻.md)
+自动盘点：
 
-目标原生重建：[`project-migration/references/11-目标原生重建.md`](project-migration/references/11-目标原生重建.md)
+```bash
+python3 project-migration/scripts/inventory_frontend.py /path/to/frontend \
+  --output .migration/source-inventory.json
+```
 
-多 Agent / 多会话编排：[`project-migration/references/12-多Agent与多会话编排.md`](project-migration/references/12-多Agent与多会话编排.md)
+盘点对比：
+
+```bash
+python3 project-migration/scripts/compare_frontend_inventory.py \
+  .migration/source-inventory.json \
+  .migration/final-inventory.json
+```
+
+脚本只使用 Python 标准库。
+
+## 目录
+
+```text
+project-migration/
+├── SKILL.md
+├── agents/
+├── scripts/        # 确定性盘点与对比
+├── references/     # 按阶段渐进加载的方法与规则
+├── templates/      # 迁移过程中的输出模板
+├── examples/       # 完整工作流示例
+└── tests/          # 脚本回归测试
+```
+
+## 建议触发语句
+
+- “把这个 Vue 页面迁到目标 React 项目，保持现有视觉和交互。”
+- “评估 AngularJS 管理后台迁到 React + Vite 的风险与波次。”
+- “把 Webpack 项目升级到 Vite，并证明所有 Route 没有回归。”
+- “审查这次前端迁移是否漏了隐藏入口、Loading/Error 状态和移动端行为。”

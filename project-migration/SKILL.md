@@ -1,645 +1,297 @@
 ---
 name: project-migration
-description: 专注于前端项目、页面、功能模块和用户体验的跨项目迁移与现代化，支持 React、Vue、Angular、Svelte 等框架之间迁移，以及 SPA、SSR、MPA、微前端、状态管理、路由、组件库和样式体系迁移。先从源前端真实入口递归理解现役功能，识别被注释、隐藏、禁用和废弃能力，建立页面视觉与交互基线，再研究目标项目的前端架构、语言、组件、状态和样式惯例，以目标原生方式 Rebuild，同时要求功能、视觉、响应式和交互与源项目现役体验对齐。大模块支持 Supervisor + Workstreams 多 Agent / 多会话协作。全过程使用中文。
+description: 当前端代码库需要迁移或升级时使用，包括页面或功能跨项目搬迁，Vue、React、Angular、Svelte 之间改写，JavaScript 到 TypeScript，Webpack 到 Vite，SPA 到 SSR 或微前端，以及路由、状态管理、请求层、组件库、样式体系或 Design System 替换；也用于审查迁移前后功能、视觉、交互、响应式、可访问性和运行质量是否等价。纯后端或数据库迁移、从零新建且没有既有行为基线的页面不使用。
+metadata:
+  author: lin52025iq
+  version: "2.0.0"
 ---
 
 # 前端项目迁移
 
-## 1. 角色与最终目标
+把前端迁移视为**用户可观察契约的重建与验证**，而不是源组件、目录或语法的一对一翻译。
 
-你是“前端迁移负责人”，不是代码翻译器、组件搬运器，也不是未经批准的 UI 设计师。
+默认使用中文输出；用户明确指定其他语言时遵从用户要求。代码符号、路径、命令和产品名保持原样。
 
-本 Skill 主要服务于：
+## 1. 先选择执行模式
 
-- 一个前端项目的页面或功能迁到另一个前端项目；
-- Vue / React / Angular / Svelte 等框架互迁；
-- JavaScript → TypeScript；
-- 老 SPA → 新 SPA / SSR / Router 架构；
-- 老组件库 → 新组件库 / Design System；
-- CSS / Less / Sass / CSS Modules / CSS-in-JS / Tailwind 等样式体系迁移；
-- 状态管理、请求层、权限、路由和构建工具迁移；
-- 微前端拆分、合并或现代化；
-- 在迁移过程中清理废弃功能和不合理前端设计。
+根据请求选择最小充分模式，不把所有任务都升级成大型迁移项目。
 
-后端 API、数据库、消息和任务只在它们影响前端功能、数据契约、权限、状态或页面行为时继续追踪；它们不是本 Skill 的主要实现对象。
+| 模式 | 适用请求 | 默认产出 | 是否改代码 |
+|---|---|---|---|
+| 评估 | “能不能迁”“风险多大”“选什么方案” | 范围、风险、可行性、建议路径 | 否 |
+| 规划 | “给迁移方案/拆任务/排阶段” | 契约、目标蓝图、波次计划、验收方案 | 否 |
+| 执行 | “把这个页面/项目迁过去” | 代码、迁移记录、验证证据 | 是 |
+| 验收 | “检查迁移是否完整/有没有回归” | 差异清单、证据、结论 | 默认否 |
 
-迁移成功同时要求：
+再按范围选择工作量：
 
-1. **功能正确**：现役用户能力、业务规则和页面状态没有遗漏；
-2. **生命周期正确**：Deprecated / Removed 功能没有被错误恢复，Conditional 功能没有被误删；
-3. **视觉正确**：未经批准 redesign 时，关键页面布局和视觉结果跟随源项目现役界面对齐；
-4. **交互正确**：Loading、Empty、Error、Disabled、Modal、表单、滚动等状态和反馈符合源行为；
-5. **响应式正确**：源项目真实支持的 viewport / breakpoint 行为得到保留；
-6. **目标原生**：目标代码符合目标前端项目的组件、状态、样式、路由和测试惯例，不是旧框架换语法；
-7. **可验证**：功能、视觉、交互和关键 Accessibility 都有验收证据。
+- **小型**：单组件、单页面或不超过一个独立用户流程。只保留必要记录。
+- **标准**：一个 Feature、页面组、路由域或技术子系统。
+- **大型**：多应用、微前端、多个路由域或跨团队迁移。使用 Workstreams 和持久化状态。
 
-## 2. 强制语言规则
+缺少信息时先检查仓库和现有证据；仍无法确认的事实写入假设与未知项，不凭空补全。
 
-整个 Skill 的工作语言始终为中文。
+## 2. Rule Zero：确认真实迁移前状态
 
-- 分析、计划、风险、功能文档、视觉基线、审查结果和阶段报告全部使用中文；
-- 代码符号、文件路径、Route、CSS selector、技术产品名和命令保持原样；
-- 引用英文资料后，用中文说明迁移意义；
-- `.migration/` 下迁移记录默认使用中文。
+在规划、安装依赖或改代码之前，先确认工作树和基线来源：
 
-## 3. 前端迁移默认模型
-
-默认采用：
-
-```text
-Research Source
-→ Lifecycle Classification
-→ Recursive Feature Discovery
-→ Visual & Interaction Baseline
-→ Semantic Distillation
-→ Review Target Frontend
-→ Target-native Blueprint
-→ Pilot
-→ Rebuild
-→ Functional + Visual + Interaction Verification
+```bash
+git status --short
+git rev-parse HEAD
+git diff -- package.json pnpm-lock.yaml yarn.lock package-lock.json bun.lock bun.lockb
 ```
 
-也就是：
+同时检查框架、构建、路由和测试配置是否已被修改。
 
-```text
-源代码 / 源页面
-↓
-先判断哪些功能现在真的存在
-↓
-递归下钻理解功能和状态
-↓
-记录用户实际看到的页面与交互
-↓
-蒸馏技术无关语义
-↓
-研究目标前端项目怎样组织代码
-↓
-形成目标页面 / 模块蓝图
-↓
-按目标项目方式重建
-↓
-与源现役功能和视觉基线对照
+记录基线可信度：
+
+- **exact**：存在可运行的迁移前 commit、tag、branch、worktree 或发布制品；
+- **partial**：只能恢复部分依赖、页面或数据；
+- **unavailable**：没有可靠迁移前状态，只能依赖截图、设计稿、历史测试或产品说明。
+
+禁止在未获明确批准时执行 `reset`、`checkout`、`clean`、`stash`、覆盖 lockfile 或删除用户改动。工作树已处于迁移中时，先识别“旧状态”和“当前状态”，不要把当前状态误当作 before baseline。
+
+详见 `references/16-自动化盘点与迁移证据.md`。
+
+## 3. 六阶段执行闭环
+
+### 阶段 A：限定范围并自动盘点
+
+明确：
+
+- 源项目与目标项目位置；
+- 迁移页面、Route、Feature 或技术子系统；
+- 是否允许 redesign、行为修正或技术现代化；
+- 浏览器、设备、locale、theme、权限和数据范围；
+- 明确不迁移的内容。
+
+先运行确定性盘点，再做人工语义判断：
+
+```bash
+python3 <skill-root>/scripts/inventory_frontend.py <source-root> \
+  --output .migration/source-inventory.json
+
+python3 <skill-root>/scripts/inventory_frontend.py <target-root> \
+  --output .migration/target-inventory.json
 ```
 
-**源代码回答“旧产品现在做什么和长什么样”；目标项目回答“新代码应该怎么写”。**
+盘点结果用于发现 package manager、框架、构建工具、Router、State、UI、Styling、测试配置、入口、Route 候选和生命周期信号。脚本输出的是**线索**，不是产品决策。
 
-## 4. 七类前端可观察契约
+继续检查真实入口：Route、Menu、Tab、Deep Link、Modal、Drawer、Feature Flag、Permission、Store action、WebSocket/Event、后台刷新和微前端入口。
 
-每个迁移能力都至少检查以下适用项。
+**阶段门禁：** 范围、基线来源和关键入口已明确；无法确认的项目已显式标记。
 
-### 4.1 功能契约
+### 阶段 B：建立源契约与基线
 
-- 用户能做什么；
-- 功能入口在哪里；
-- 前置条件；
-- 成功 / 失败结果；
-- 业务规则。
-
-### 4.2 导航契约
-
-- Route；
-- Menu / Sidebar / Navbar；
-- Tab；
-- Deep Link；
-- Redirect；
-- Guard / Permission；
-- Modal / Drawer / Popover 入口。
-
-### 4.3 状态契约
-
-至少检查适用的：
+从用户路径向下追踪：
 
 ```text
-Default
-Loading / Skeleton
-Empty
-Error
-Partial Data
-Disabled
-Read-only
-Hover
-Focus / Focus-visible
-Active / Pressed
-Selected
-Expanded / Collapsed
-Editing
-Validation Error
-Submitting
-Success Feedback
-Permission Denied
-Offline / Timeout
-Long Content / Overflow
-```
-
-### 4.4 交互契约
-
-- Click / Input / Submit；
-- Keyboard；
-- Focus；
-- Scroll；
-- Drag / Drop；
-- Debounce / Throttle；
-- Optimistic Update；
-- Modal close；
-- Unsaved changes；
-- Pagination / Infinite scroll。
-
-### 4.5 视觉契约
-
-- 页面框架；
-- Grid / Flex / Position；
-- 宽高与 max/min；
-- margin / padding / gap；
-- 字体；
-- 颜色；
-- 边框 / 圆角 / 阴影；
-- Icon / Image；
-- z-index；
-- overflow / scroll owner；
-- Theme / Design Token。
-
-### 4.6 响应式契约
-
-- breakpoint；
-- mobile / tablet / desktop 布局变化；
-- hide / show；
-- wrap；
-- navigation transformation；
-- table / card transformation；
-- viewport / container query。
-
-### 4.7 平台与质量契约
-
-- Accessibility；
-- i18n / locale；
-- date / number format；
-- analytics；
-- SEO / metadata；
-- SSR / hydration；
-- asset / font；
-- build / code splitting；
-- 性能和运行错误。
-
-## 5. 功能存在不等于需要迁移
-
-### 5.1 必须建立功能生命周期
-
-仓库中的组件、Route、API 和 CSS 只能证明代码存在，不能证明功能当前仍有效。
-
-每个关键功能分类为：
-
-- **Active**：现役；
-- **Conditional**：条件现役；
-- **Hidden**：默认隐藏但可能可达；
-- **Disabled**：明确关闭但可能恢复；
-- **Deprecated**：有废弃 / 替代证据；
-- **Removed**：产品能力已移除，只剩残留；
-- **Unknown**：证据不足。
-
-详见 `references/14-功能生命周期与废弃识别.md`，使用 `templates/04-功能生命周期清单.md`。
-
-### 5.2 前端必须主动检查这些“非现役信号”
-
-- JSX / TSX 注释块；
-- Vue / Angular / HTML 注释；
-- Route 被注释或未注册；
-- Menu / Tab 被注释；
-- Feature Flag 长期关闭；
-- 永假条件；
-- CSS `display:none` / `hidden`；
-- 权限永不可达；
-- 旧组件已有新替代；
-- deprecated / legacy / old 标记；
-- skip / disabled tests；
-- API 已无调用方。
-
-看到注释代码时：
-
-> 研究它表达过什么功能，但默认不要恢复并迁移。
-
-同时不能因为 UI 被隐藏就直接判定废弃，必须继续查 Route、Flag、权限、替代实现和调用关系。
-
-## 6. 先递归生成功能文档
-
-对源前端先枚举真实入口：
-
-- 页面 Route；
-- Menu / Navigation；
-- Tab；
-- 页面按钮和交互动作；
-- Modal / Drawer；
-- Deep Link；
-- Event / WebSocket；
-- Store action；
-- Background refresh；
-- Micro-frontend entry。
-
-然后沿：
-
-```text
-UI 入口
-→ 条件显示 / 权限
-→ 页面 / 容器逻辑
-→ 状态管理
-→ 数据请求
+入口
+→ 可见条件 / 权限
+→ 页面与组件行为
+→ 状态所有权
+→ Query / Mutation / Event
 → 业务判断
 → UI 状态变化
-→ 后续交互 / 页面跳转
-→ 用户最终可观察结果
+→ 跳转、反馈与副作用
 ```
 
-不断向下研究。
+对每项能力分类：
 
-只要仍出现新的功能点、状态、条件、数据语义、交互或副作用就继续；纯 UI plumbing 或无业务意义工具函数可以停止。
+- Active
+- Conditional
+- Hidden
+- Disabled
+- Deprecated
+- Removed
+- Unknown
 
-先形成：
+默认不恢复注释代码、未注册 Route、长期关闭 Flag 或已有替代实现。隐藏不等于废弃，必须结合可达性、权限、调用方、版本历史和产品证据判断。
 
-```text
-.migration/功能文档.md
-.migration/功能生命周期清单.md
-```
+至少建立适用的六类契约：
 
-再形成：
+1. **功能与导航**：用户能力、Route、Deep Link、Guard、跳转和失败结果；
+2. **数据与状态**：Server State、Global State、Local UI State、缓存、并发和取消；
+3. **交互**：Click、Keyboard、Focus、Form、Modal、Scroll、Drag、Optimistic Update；
+4. **视觉与响应式**：布局、spacing、字体、颜色、图标、断点、overflow 和 z-index；
+5. **平台**：SSR/Hydration、SEO、i18n、analytics、asset、font、browser support；
+6. **质量**：测试、console error、Accessibility、性能和 bundle 行为。
 
-```text
-.migration/迁移语义规格.md
-```
+关键页面优先记录：
 
-详见 `references/01-源系统理解.md` 和 `references/13-功能文档与递归下钻.md`。
+- 固定数据与账号条件；
+- desktop / tablet / mobile viewport；
+- Default、Loading、Empty、Error、Disabled、Validation、Permission Denied；
+- 截图、DOM 尺寸、console、network 和测试结果。
 
-## 7. 前端视觉基线是正式迁移输入
+**阶段门禁：** Active / Conditional 能力和关键 UI 状态都有证据；Deprecated / Removed 有不迁移依据；视觉基线可重复。
 
-### 7.1 默认不是 redesign
+详见 `references/13-功能文档与递归下钻.md`、`references/14-功能生命周期与废弃识别.md`、`references/15-前端视觉与交互还原.md`。
 
-如果用户没有明确要求重新设计页面：
+### 阶段 C：研究目标项目并形成目标原生蓝图
 
-> **目标代码结构可以重建，目标视觉与交互默认跟随源项目现役页面。**
+先找目标项目中 2～5 个维护良好、近期使用、测试充分的相似范例，覆盖：
 
-不能因为：
+- Router 与 Page / Feature 边界；
+- Server / Client data fetching；
+- cache、state、form、error boundary 和 permission；
+- Component Library、Design System、Token、Icon 和 Styling；
+- unit、component、Storybook、E2E、visual regression 和 a11y 测试。
 
-- 换了 React / Vue；
-- 换了组件库；
-- 换了 CSS 技术；
-- 目标项目有不同默认样式；
+从“源契约 + 目标项目范例”推导目标结构，不从源文件树推导。
 
-就静默改变页面布局和展示。
+蓝图至少说明：
 
-### 7.2 为关键页面建立基线
+- Route、页面和组件边界；
+- 状态所有权与数据流；
+- API / Event / Cache 适配；
+- UI 状态与响应式实现；
+- 复用目标组件和 Design Token 的位置；
+- 临时 bridge / adapter 及删除条件；
+- 批准的行为或视觉差异；
+- 验证方式。
 
-使用 `templates/10-前端视觉基线.md`，记录：
+**阶段门禁：** 蓝图符合目标项目惯例；不存在明显 `.vue → .tsx`、旧 Store → 新 Store、旧 CSS 树 → 新 CSS 树的一对一投影。
 
-- viewport / breakpoint；
-- page shell；
-- header / sidebar / main；
-- 宽高和滚动；
-- Grid / Flex；
-- spacing；
-- font；
-- color；
-- border / radius / shadow；
-- icon / image；
-- UI 状态矩阵；
-- responsive behavior；
-- interaction flow；
-- Accessibility。
+详见 `references/07-跨技术栈迁移.md`、`references/11-目标原生重建.md`。
 
-优先视觉证据：
+### 阶段 D：选择试迁移与实施波次
 
-```text
-源项目可运行页面真实截图
-→ Storybook / 组件示例
-→ 产品截图 / 设计稿
-→ DOM + CSS + 组件结构
-```
+按风险而不是目录排序：
 
-详见 `references/15-前端视觉与交互还原.md`。
+- 用户影响；
+- 状态与副作用复杂度；
+- 第三方组件和 API 耦合；
+- SSR / hydration / micro-frontend 风险；
+- 视觉和响应式敏感度；
+- 测试与基线完整度。
 
-## 8. 建立前端语义防火墙
+标准或大型迁移先选一个**有代表性但边界可控**的试迁移，验证规则、目标结构和验收手段。不要先挑最简单页面制造虚假信心，也不要一开始迁全仓库。
 
-正式实现前优先形成：
+按用户能力、Route 域或可独立验收的 Feature 切波次。共享 Router、Global Store、Theme、Design Token 和核心 Layout 默认单写者维护。
 
-```text
-.migration/功能文档.md
-.migration/功能生命周期清单.md
-.migration/前端视觉基线.md
-.migration/迁移语义规格.md
-.migration/目标项目画像.md
-.migration/目标实现蓝图.md
-```
+**阶段门禁：** 试迁移能暴露主要风险；每个波次都有输入、所有者、退出条件和回滚边界。
 
-目标实现蓝图不能从源文件树直接生成。
+### 阶段 E：小步实施并逐单元验证
 
-开始写目标代码后，上下文优先级：
+每次只迁移一个可解释、可验证的单元：
 
-```text
-1. 目标前端项目真实代码和优秀范例
-2. 目标实现蓝图
-3. 源页面视觉 / 交互基线
-4. 迁移语义规格
-5. 技术栈迁移规则
-6. 源代码：只用于具体事实回查
-```
+1. 阅读目标范例、蓝图和契约；
+2. 实现目标原生代码；
+3. 运行 format、lint、typecheck 和相关测试；
+4. 检查页面、console、network、交互和截图；
+5. 记录差异与新事实；
+6. 通过门禁后再进入下一单元。
 
-## 9. 目标前端项目必须先研究
+Codemod 只作为候选变更生成器：
 
-设计目标页面前至少研究：
+- 先 dry-run；
+- 保存工具版本和命令；
+- 分小批审查 diff；
+- 不自动接受生命周期、状态所有权、事件、slot/children、effect 或样式语义变化；
+- 每批保留回退点。
 
-### 工程
+同类失败重复出现时，暂停批量迁移，先修正规则、蓝图或自动化流程，再修实例。
 
-- package manager；
-- bundler / dev server；
-- TypeScript config；
-- module / alias；
-- lint / format；
-- build / deploy；
-- environment config。
+### 阶段 F：迁移后对照、发布与清理
 
-### 应用架构
+组合使用：
 
-- Router；
-- Page / Feature / Module 边界；
-- Server / Client component（如适用）；
-- data fetching；
-- cache；
-- global / local state；
-- form；
-- error boundary；
-- permission。
+- build、lint、typecheck；
+- component / integration / E2E；
+- Route 与 Deep Link 对照；
+- old/new behavior comparison；
+- screenshot / Storybook visual test；
+- keyboard、focus、form、modal、scroll 和 responsive 流程；
+- Accessibility；
+- console、network、hydration 和性能证据。
 
-### UI
-
-- Component library；
-- Design System；
-- CSS / styling 技术；
-- Theme；
-- Token；
-- Icon；
-- Typography；
-- Layout component；
-- responsive conventions。
-
-### 测试
-
-- unit / component；
-- Storybook；
-- E2E；
-- visual regression；
-- accessibility testing。
-
-先找 2～5 个目标项目中维护良好、近期活跃、测试充分的相似页面 / 模块作为范例。
-
-## 10. 禁止按源前端结构一对一复制
-
-除非有明确产品或契约理由，默认禁止：
-
-- 一个源 `.vue` → 一个目标 `.tsx`；
-- 一个 Angular Component → 一个 React Component；
-- 一个旧 Page → 按旧组件树完整复刻；
-- 一个 Store module → 一个目标 Store module；
-- 一个旧 mixin / hook → 一个目标 hook；
-- 一个旧 CSS / Less 文件 → 一个目标样式文件；
-- 批量复制 utils / helpers / base components；
-- Controller-shaped React、Angular-shaped React、Vue-shaped React 等结构。
-
-允许保持的是产品概念、页面语义、视觉和交互契约，不是旧框架的实现分解。
-
-## 11. 样式迁移：视觉保持，CSS 架构可重建
-
-可以：
-
-- Less / Sass → CSS Modules；
-- CSS → Tailwind；
-- styled-components → 目标项目样式方案；
-- float / clearfix → Grid / Flex；
-- magic values → 目标 Design Token；
-- 老组件库 → 目标组件库。
-
-但要验证：
-
-- 页面布局没有意外变化；
-- 间距和尺寸对齐；
-- 字体和图标对齐；
-- responsive 对齐；
-- Loading / Empty / Error / Disabled 等状态对齐；
-- 新组件库没有静默改变交互。
-
-## 12. 九阶段前端迁移状态机
-
-```text
-阶段 0：前端迁移接入与范围
-    ↓
-阶段 1：源功能发现 + 生命周期判断
-    ↓
-阶段 2：功能文档 + 视觉 / 交互基线
-    ↓
-阶段 3：迁移边界 + 技术无关语义
-    ↓
-阶段 4：目标前端项目研究 + 目标蓝图
-    ↓
-阶段 5：验证裁判 + 试迁移
-    ↓
-阶段 6：目标原生 Rebuild
-    ↓
-阶段 7：功能 + 视觉 + 交互 + Accessibility 审查
-    ↓
-阶段 8：发布、灰度与旧前端清理
-```
-
-### 阶段门禁
-
-| 阶段 | 前端关键退出条件 |
-|---|---|
-| 0 | 页面 / 功能范围、源与目标技术栈、是否允许 redesign、浏览器/设备范围明确 |
-| 1 | 关键页面和入口已发现；功能生命周期已分类；注释 / 隐藏 / Flag / 权限已检查 |
-| 2 | 功能树完整；关键页面有视觉基线；主要 UI 状态与 responsive 行为有记录 |
-| 3 | Active / Conditional 能力有明确迁移去向；Deprecated / Removed 有不迁移证据；语义规格不依赖源组件结构 |
-| 4 | 已研究目标前端范例、组件、状态、样式、路由、测试；目标蓝图不是源组件树投影 |
-| 5 | 关键功能有功能裁判；关键页面有视觉裁判；高风险页面完成试迁移 |
-| 6 | 实现主要依据目标项目范例、蓝图和视觉基线；源代码只做事实回查 |
-| 7 | 功能、视觉、交互、响应式、关键 Accessibility 通过；无阻断 Copy-Smell |
-| 8 | 新页面真实可用；旧 Route / component / CSS / Flag / asset 清理条件满足 |
-
-## 13. 前端验证裁判
-
-不能只跑 unit test。
-
-按风险组合：
-
-### 功能
-
-- component test；
-- integration；
-- E2E；
-- API mock / contract；
-- old/new behavior comparison。
-
-### 视觉
-
-- 页面截图基线；
-- component screenshot；
-- Storybook visual test；
-- Playwright `toHaveScreenshot()` 等现有项目能力；
-- 人工视觉确认。
-
-视觉比较尽量固定 browser、OS/rendering environment、viewport、字体、locale、theme、数据和 animation；环境不同产生的像素差异不要误判为产品差异。
-
-### 交互
-
-- hover / focus；
-- keyboard；
-- form validation；
-- modal / drawer；
-- loading / empty / error；
-- permission；
-- scroll；
-- responsive navigation。
-
-### 差异分类
-
-所有差异归类：
+所有差异归类为：
 
 - 必须修复；
-- 批准的产品 / 视觉变化；
+- 已批准的产品或视觉变化；
 - 环境噪声；
 - Unknown。
 
-不要通过无限扩大视觉 diff threshold 掩盖真实回归。
+可使用：
 
-## 14. 前端多 Agent / 多会话
-
-大前端项目优先按稳定产品能力拆 Workstream，而不是按目录平均分。
-
-推荐角色：
-
-- Route / Navigation / Lifecycle Research Worker；
-- Page Feature Research Worker；
-- Visual Baseline Worker；
-- Data / State / API Worker；
-- Page Group Implementation Worker；
-- Responsive / Interaction Worker；
-- Visual Regression Reviewer；
-- Accessibility / Copy-Smell Reviewer。
-
-示例：
-
-```text
-Supervisor
-├── WS-FE-01 路由与功能生命周期
-├── WS-FE-02 订单页面功能和状态
-├── WS-FE-03 订单页面视觉基线
-├── WS-FE-04 请求层 / 状态模型
-├── WS-FE-05 页面 Rebuild
-└── WS-FE-06 Visual + Interaction Review
+```bash
+python3 <skill-root>/scripts/compare_frontend_inventory.py \
+  .migration/source-inventory.json \
+  .migration/final-inventory.json
 ```
 
-同一核心页面、共享 Route、全局 Store、Theme、Design Token 默认使用单写者。
+只有功能、视觉、交互、响应式、平台和质量门禁都满足，才允许声明完成。Build 成功、页面能打开或 API 能请求都不能单独代表迁移完成。
 
-详见 `references/12-多Agent与多会话编排.md`。
+## 4. 最小迁移包
 
-## 15. `.migration/` 前端工作区
-
-中大型前端迁移优先维护：
+优先使用 `templates/00-最小前端迁移包.md`。标准任务只强制维护以下产物：
 
 ```text
 .migration/
-├── 迁移上下文.md
-├── 当前状态.md
-├── 源系统理解.md
-├── 功能文档.md
-├── 功能生命周期清单.md
-├── 前端视觉基线.md
-├── 迁移语义规格.md
-├── 业务规则台账.md
-├── 能力迁移矩阵.md
-├── 迁移边界.md
-├── 目标项目画像.md
-├── 目标实现蓝图.md
-├── 技术栈迁移规则.md
-├── 设计改进台账.md
-├── 迁移计划.md
-├── 多Agent编排总览.md
-├── 差异与失败队列.md
-├── 验证报告.md
-└── 切换与回滚.md
+├── context.md                 # 范围、模式、基线来源、假设
+├── source-inventory.json      # 源项目自动盘点
+├── target-inventory.json      # 目标项目自动盘点
+├── contract.md                # 功能、视觉、交互与生命周期契约
+├── plan.md                    # 目标蓝图、试迁移与波次
+└── verification.md            # 命令、结果、差异与结论
 ```
 
-必要时：
+小型任务可以把 Markdown 合并为一个文件。大型任务再按需使用现有详细模板、`workstreams/`、`tests/`、`fixtures/` 和 `results/`。不要为了“流程完整”机械创建空文档。
 
-```text
-.migration/workstreams/
-.migration/tests/
-.migration/fixtures/
-.migration/results/
-.migration/scripts/
-```
+## 5. 硬门禁
 
-`.migration/` 根目录保持声明式；可执行代码只进入受控子目录。详见 `references/10-.migration目录边界.md`。
+以下任一项不满足时，不扩大实施范围：
 
-## 16. 前端完成定义
+- 未确认真实迁移前状态或基线可信度；
+- 未完成关键功能生命周期判断；
+- 未建立关键页面和状态基线；
+- 未研究目标项目范例；
+- 未定义可执行的验证裁判；
+- 试迁移暴露系统性问题但规则尚未修正；
+- 迁移后差异仍未归类；
+- 临时 bridge、旧 Route、Flag、CSS、asset 或依赖没有清理决策。
 
-只有同时满足以下条件，才允许声明迁移完成：
+## 6. 多 Agent / 多会话
 
-- Active / Conditional 关键功能都有明确终态；
-- Deprecated / Removed 功能没有被错误恢复；
-- Hidden / Disabled / Unknown 功能已有明确决策；
-- 页面、Route、Menu、Deep Link 和权限可达性符合要求；
-- 关键业务功能已验证；
-- Loading / Empty / Error / Disabled 等关键 UI 状态已验证；
-- 主要交互流程已验证；
-- 源项目真实支持的主要 viewport / breakpoint 已验证；
-- 未经批准 redesign 的页面与视觉基线对齐；
-- 字体、Icon、图片、Theme、关键 spacing 无未解释漂移；
-- 目标实现符合目标项目组件、路由、状态、样式和测试惯例；
-- 无阻断级源框架 Copy-Smell；
-- Accessibility 阻断项关闭或明确接受；
-- visual diff 均已修复、批准或解释；
-- 多 Workstream 已完成统一集成验证；
-- 临时迁移代码和旧前端路径有清理决策；
-- `.migration/当前状态.md` 与实际前端项目一致。
+仅在范围确实大型时启用 Supervisor + Workstreams。按稳定产品能力拆分，不按目录平均分配。
 
-构建通过、页面能打开、API 能请求，都不能单独作为完成依据。
+推荐 Workstream：
 
-## 17. 参考文档路由
+- Route / Lifecycle Research；
+- Feature Contract Research；
+- Visual Baseline；
+- Data / State / API；
+- Page Group Implementation；
+- Responsive / Interaction Review；
+- Visual / Accessibility / Copy-Smell Review。
 
-前端迁移优先读取：
+共享架构和全局资源保持单写者。每个 Workstream 使用明确输入、禁止修改范围、交接证据和集成门禁。
 
-- `references/01-源系统理解.md`：源代码递归理解；
-- `references/13-功能文档与递归下钻.md`：功能树和下钻停止条件；
-- `references/14-功能生命周期与废弃识别.md`：注释、隐藏、禁用、废弃和替代功能；
-- `references/15-前端视觉与交互还原.md`：布局、视觉、响应式、UI 状态和视觉验收；
-- `references/11-目标原生重建.md`：目标项目驱动 Rebuild 和 Copy-Smell；
-- `references/07-跨技术栈迁移.md`：语言 / 框架语义；
-- `references/09-设计现代化与代码质量.md`：受控现代化；
-- `references/12-多Agent与多会话编排.md`：Supervisor / Workstreams；
-- `references/05-验证与审查.md`：验证裁判；
-- `references/08-最终检查清单.md`：最终总体验收；
-- `references/10-.migration目录边界.md`：工作区约束。
+详见 `references/12-多Agent与多会话编排.md`。
 
-其他 references 只在前端依赖确实涉及对应系统能力时读取。
+## 7. 最终输出格式
 
-## 18. 模板路由
+每次阶段性或最终交付都按以下顺序报告：
 
-源前端研究优先使用：
+1. **模式与范围**：评估 / 规划 / 执行 / 验收，包含与排除项；
+2. **基线可信度**：exact / partial / unavailable，证据位置；
+3. **已完成变更**：按用户能力或 Route 描述，不按文件数量描述进度；
+4. **验证证据**：命令、exit code、测试数、截图/console/a11y/visual 结果；
+5. **差异与风险**：必须修复、批准变化、环境噪声、Unknown；
+6. **清理与回滚**：旧路径、临时 bridge、Flag、依赖和回退方式；
+7. **结论**：通过、有限通过或不通过，以及阻断原因。
 
-- `templates/04-功能文档.md`；
-- `templates/04-功能生命周期清单.md`；
-- `templates/05-迁移语义规格.md`。
+## 8. 按需读取路由
 
-视觉和目标设计优先使用：
+- 总体方法：`references/00-项目迁移方法论.md`
+- 前端跨栈规则与 Codemod：`references/07-跨技术栈迁移.md`
+- 目标原生页面 / Feature 设计：`references/11-目标原生重建.md`
+- 功能递归理解：`references/13-功能文档与递归下钻.md`
+- 功能生命周期：`references/14-功能生命周期与废弃识别.md`
+- 视觉、交互和响应式：`references/15-前端视觉与交互还原.md`
+- 自动盘点、基线和证据：`references/16-自动化盘点与迁移证据.md`
+- 多 Agent：`references/12-多Agent与多会话编排.md`，仅大型任务读取
+- 快速示例：`examples/vue-to-react-page-migration.md`
 
-- `templates/10-前端视觉基线.md`；
-- `templates/10-目标项目画像.md`；
-- `templates/12-目标实现蓝图.md`。
-
-大模块、多 Agent / 多对话使用：
-
-- `templates/16-多Agent编排总览.md`；
-- `templates/17-子Agent工作包.md`；
-- `templates/18-子Agent交接.md`。
-
-最终验证使用：
-
-- `templates/23-验证报告.md`；
-- `templates/24-切换与回滚.md`。
-
-模板用于统一证据和状态，不要求机械填满所有字段。
+详细模板仅在对应阶段需要持久化证据时读取，不在 Skill 触发时一次性加载。
