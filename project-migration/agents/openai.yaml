@@ -1,4 +1,4 @@
 interface:
-  display_name: "项目迁移"
-  short_description: "迁移系统能力，并以目标项目原生方式重建实现"
-  default_prompt: "使用 $project-migration 完成这个迁移任务：先枚举旧系统真实入口，沿调用链、数据流、副作用和异步链路不断递归下钻，生成带代码证据的功能树与功能文档；在功能文档完整后再蒸馏技术无关的迁移语义规格。随后研究新项目的语言、架构、惯例和可复用能力，基于目标项目范例重新设计并 Rebuild；不要按旧文件、类或函数逐个复制翻译。若范围较大且可按独立能力拆分，主动采用 Supervisor + Workstreams，把研究、实现和验证委派给多个子 Agent 或独立对话，并通过工作包、交接和统一集成 Gate 协作。"
+  display_name: "前端项目迁移"
+  short_description: "迁移前端功能，并还原页面视觉与交互体验"
+  default_prompt: "使用 $project-migration 完成这个前端迁移任务：先枚举源项目 Route、导航、页面和交互入口，递归下钻生成功能文档，并检查被注释、隐藏、禁用、Feature Flag、权限和已替代功能的生命周期；只迁移确认需要的现役或条件现役能力。对关键页面建立布局、样式、响应式和 Loading/Empty/Error 等 UI 状态的视觉基线。随后研究目标前端项目的框架、Router、State、组件库、Design System、Styling 和测试惯例，以目标原生方式 Rebuild；未经明确批准不要 redesign，目标页面应跟随源项目现役视觉和交互进行对齐。范围较大时主动采用 Supervisor + Workstreams，把功能研究、视觉基线、页面实现和独立验收拆给多个子 Agent 或独立对话。"
