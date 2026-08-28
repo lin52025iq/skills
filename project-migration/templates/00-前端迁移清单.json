@@ -1,0 +1,262 @@
+{
+  "schemaVersion": "1.0",
+  "migrationId": "FE-MIG-001",
+  "title": "订单列表页面迁移",
+  "status": "discovery",
+  "tier": "slice",
+  "modes": [
+    "page-feature",
+    "framework",
+    "router",
+    "state-data",
+    "styling"
+  ],
+  "redesignPolicy": "parity",
+  "evidencePolicy": {
+    "allowedStatuses": [
+      "observed",
+      "measured",
+      "reported",
+      "inferred",
+      "unknown"
+    ],
+    "defaultConfidence": "medium"
+  },
+  "source": {
+    "root": "../legacy-app",
+    "application": "legacy-web",
+    "commit": "replace-with-source-commit",
+    "stackSnapshot": ".migration/source-stack.json",
+    "runtime": {
+      "available": true,
+      "url": "http://localhost:3000",
+      "startCommand": "npm run dev",
+      "testAccount": "fixture-user",
+      "notes": "不要在清单中保存密码或 token"
+    }
+  },
+  "target": {
+    "root": "../new-app",
+    "application": "new-web",
+    "commit": "replace-with-target-commit",
+    "stackSnapshot": ".migration/target-stack.json",
+    "runtime": {
+      "available": true,
+      "url": "http://localhost:5173",
+      "startCommand": "pnpm dev"
+    },
+    "referenceFeatures": [
+      {
+        "path": "src/features/customers",
+        "reason": "相似列表页，包含 Router、请求缓存、Empty/Error 和测试"
+      }
+    ]
+  },
+  "scope": {
+    "include": [
+      "订单列表 Route、筛选、分页、权限、视觉和响应式"
+    ],
+    "exclude": [
+      "订单详情页",
+      "后端订单 API 重写"
+    ],
+    "nonGoals": [
+      "未经批准重新设计订单页面"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "CAP-ORDER-001",
+      "name": "查看和筛选订单列表",
+      "lifecycle": "active",
+      "evidenceStatus": "observed",
+      "sourceEvidence": [
+        "src/router/orders.ts:12",
+        "runtime:/orders?status=open"
+      ],
+      "conditions": [
+        "permission:orders.read"
+      ],
+      "targetDisposition": "migrate",
+      "targetLocation": "src/features/orders",
+      "acceptance": [
+        "有权限用户可通过 /orders 和菜单进入",
+        "筛选条件写入 URL 并可通过 deep link 恢复",
+        "Loading、Empty、Error 和长列表状态与批准基线一致"
+      ],
+      "approval": ""
+    },
+    {
+      "id": "CAP-ORDER-LEGACY-EXPORT",
+      "name": "旧版批量导出入口",
+      "lifecycle": "removed",
+      "evidenceStatus": "observed",
+      "sourceEvidence": [
+        "src/pages/orders/LegacyExport.vue:1",
+        "route and menu registration removed in commit abc123"
+      ],
+      "conditions": [],
+      "targetDisposition": "drop",
+      "targetLocation": "",
+      "acceptance": [
+        "目标项目不恢复旧版批量导出入口"
+      ],
+      "approval": "产品确认该能力已移除"
+    }
+  ],
+  "routes": [
+    {
+      "id": "ROUTE-ORDER-LIST",
+      "sourcePath": "/orders",
+      "targetPath": "/orders",
+      "lifecycle": "active",
+      "guard": "orders.read",
+      "params": [],
+      "query": [
+        "status",
+        "page",
+        "sort"
+      ],
+      "deepLinks": [
+        "/orders?status=open&page=2"
+      ],
+      "redirects": [],
+      "acceptanceScenarioIds": [
+        "SCN-ORDER-DEFAULT",
+        "SCN-ORDER-EMPTY",
+        "SCN-ORDER-ERROR",
+        "SCN-ORDER-DENIED"
+      ]
+    }
+  ],
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900,
+      "deviceScaleFactor": 1
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "deviceScaleFactor": 1
+    }
+  ],
+  "states": [
+    "default",
+    "loading",
+    "empty",
+    "error",
+    "permission-denied",
+    "long-content"
+  ],
+  "scenarios": [
+    {
+      "id": "SCN-ORDER-DEFAULT",
+      "capabilityId": "CAP-ORDER-001",
+      "title": "默认订单列表",
+      "role": "orders-reader",
+      "fixture": "fixtures/api/orders-default.json",
+      "steps": [
+        "直接打开 /orders",
+        "等待订单表格出现",
+        "选择状态 open"
+      ],
+      "assertions": [
+        "URL 包含 status=open",
+        "表格显示匹配订单",
+        "无 console error 和失败请求"
+      ],
+      "visual": true,
+      "accessibility": true
+    },
+    {
+      "id": "SCN-ORDER-EMPTY",
+      "capabilityId": "CAP-ORDER-001",
+      "title": "订单为空",
+      "role": "orders-reader",
+      "fixture": "fixtures/api/orders-empty.json",
+      "steps": [
+        "打开 /orders"
+      ],
+      "assertions": [
+        "显示 Empty 状态而不是空白页面"
+      ],
+      "visual": true,
+      "accessibility": true
+    }
+  ],
+  "verification": {
+    "commands": [
+      {
+        "name": "typecheck",
+        "cwd": "../new-app",
+        "command": "pnpm typecheck"
+      },
+      {
+        "name": "e2e",
+        "cwd": "../new-app",
+        "command": "pnpm playwright test tests/orders.spec.ts"
+      }
+    ],
+    "runtime": {
+      "consoleErrorsAllowed": [],
+      "networkFailuresAllowed": [],
+      "hydrationWarningsAllowed": []
+    },
+    "visual": {
+      "required": true,
+      "baselineDocument": ".migration/前端视觉基线.md",
+      "browser": "chromium",
+      "locale": "zh-CN",
+      "timezone": "Asia/Singapore",
+      "theme": "light",
+      "animations": "disabled",
+      "maskedRegions": []
+    },
+    "accessibility": {
+      "required": true,
+      "automated": "axe",
+      "manual": [
+        "keyboard",
+        "focus-order",
+        "dialog-focus-restore"
+      ]
+    },
+    "performance": {
+      "required": false,
+      "budgets": []
+    },
+    "residualPatterns": [
+      "legacy-ui-library",
+      "old-router-package",
+      "TODO(migration)"
+    ]
+  },
+  "approvedDifferences": [],
+  "unknowns": [
+    {
+      "id": "UNK-001",
+      "question": "移动端是否仍支持批量选择？",
+      "impact": "可能改变移动端交互和截图范围",
+      "owner": "product",
+      "status": "open"
+    }
+  ],
+  "rollout": {
+    "strategy": "feature-flag",
+    "flag": "orders_new_frontend",
+    "monitoring": [
+      "route error rate",
+      "API failure rate",
+      "order filter usage"
+    ],
+    "rollback": "关闭 orders_new_frontend 并恢复旧 Route",
+    "cleanupConditions": [
+      "全量开启 14 天无阻断回归",
+      "旧 Route 无流量",
+      "兼容 adapter 无调用方"
+    ]
+  }
+}
