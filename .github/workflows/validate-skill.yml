@@ -1,0 +1,36 @@
+name: Validate project-migration skill
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate skill structure and scripts
+        run: python tools/validate_skill.py project-migration
+
+      - name: Smoke test frontend inventory
+        run: |
+          python project-migration/scripts/frontend_inventory.py . --format json --output /tmp/frontend-inventory.json
+          python -m json.tool /tmp/frontend-inventory.json > /dev/null
+
+      - name: Smoke test migration workspace
+        run: |
+          repo_root="$(mktemp -d)"
+          python project-migration/scripts/init_migration_workspace.py "$repo_root" --profile small
+          python project-migration/scripts/validate_migration_workspace.py "$repo_root" --profile small
