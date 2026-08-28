@@ -1,40 +1,73 @@
 # 前端项目迁移 Skill
 
-`project-migration` 是一个面向 AI 编程代理的**前端项目迁移与现代化 Skill**，用于把已有前端项目中的页面、功能模块和用户体验迁移到新的前端项目，并支持 React、Vue、Angular、Svelte、JavaScript / TypeScript、SPA / SSR、微前端、状态管理、组件库和样式体系之间的迁移。
+这是一个面向 AI 编程代理的前端迁移 Skill，用于把现役页面、功能模块或完整前端能力迁入另一个项目，同时完成受控现代化。
 
-它不把迁移理解成“把旧组件换一种语法复制过去”。默认工作方式是：
+它不是“把 Vue 文件翻成 React 文件”，也不是借迁移之名重新设计页面。默认目标是：
+
+- **产品连续**：现役功能、Route、权限、状态、交互、视觉、响应式和关键 Accessibility 可验证地延续；
+- **目标原生**：新实现符合目标项目的组件、状态、请求、样式、路由、测试和发布惯例；
+- **迁移可控**：Deprecated / Removed 能力不被误恢复，差异有证据，实施可增量验证并可回滚。
+
+## 适用范围
+
+- React、Vue、Angular、Svelte 等框架互迁；
+- JavaScript → TypeScript；
+- SPA、SSR、SSG、RSC 和 Router 架构迁移；
+- 状态管理、请求层、Form、权限和深链迁移；
+- 组件库、Design System、CSS / Sass / Less / CSS Modules / CSS-in-JS / Tailwind 迁移；
+- Vite、Webpack、Rspack、workspace 和构建发布迁移；
+- 微前端拆分、合并和宿主迁移；
+- Test、Storybook、E2E、Visual Regression 和 Accessibility 体系迁移。
+
+纯后端、数据库或消息系统迁移不属于主范围，除非它们直接改变前端数据、权限或用户体验契约。
+
+## 核心流程
 
 ```text
-研究源前端真实入口
-→ 识别现役 / 隐藏 / 禁用 / 废弃功能
-→ 递归下钻生成功能文档
-→ 建立页面视觉、响应式和交互基线
-→ 蒸馏技术无关的迁移语义
-→ 研究目标前端项目架构与惯例
-→ 形成目标原生页面 / 模块蓝图
-→ Rebuild
-→ 功能 + 视觉 + 交互 + Accessibility 验收
+迁移分型与范围
+→ 源功能 / 生命周期 / 运行时证据
+→ 机器可读迁移清单 + 视觉交互基线
+→ 目标前端项目画像
+→ 目标原生蓝图 + 代表性试迁移
+→ 增量 Rebuild / Codemod
+→ 功能 + 运行时 + 视觉 + Accessibility 验证
+→ 切换、回滚和旧实现清理
 ```
-
-核心原则：
-
-- **代码存在不等于功能需要迁移**：必须检查被注释的 JSX / Template、未注册 Route、隐藏 Menu、Feature Flag、Permission、CSS hidden、替代实现和废弃证据。
-- **未经批准不做 redesign**：目标内部实现可以重建，但现役页面的布局、样式、响应式和交互默认跟随源项目对齐。
-- **先建立视觉基线再迁移页面**：关键页面要记录 viewport、Page Shell、Grid / Flex、spacing、字体、颜色、Icon、Loading / Empty / Error 等状态。
-- **目标前端项目决定代码形状**：优先复用目标项目已有 Router、State、API Client、组件库、Design System、Styling 和测试方式。
-- **禁止源结构一对一翻译**：不默认执行 `.vue → .tsx`、旧 Component → 新 Component、旧 Store → 新 Store、旧 CSS → 新 CSS 的机械映射。
-- **视觉和功能都是验收条件**：Build 成功、页面能打开、API 能调用，都不能单独代表迁移完成。
-- **大模块支持 Supervisor + Workstreams**：可以按页面能力、视觉基线、状态模型、数据层和独立验收拆给多个子 Agent / Agent Team / 独立对话。
-- Skill 工作语言始终为中文。
 
 入口：[`project-migration/SKILL.md`](project-migration/SKILL.md)
 
-前端视觉与交互：[`project-migration/references/15-前端视觉与交互还原.md`](project-migration/references/15-前端视觉与交互还原.md)
+## 结构
 
-功能生命周期：[`project-migration/references/14-功能生命周期与废弃识别.md`](project-migration/references/14-功能生命周期与废弃识别.md)
+```text
+project-migration/
+├── SKILL.md              # 精简入口、门禁、执行闭环和按需路由
+├── agents/openai.yaml    # 前端迁移默认提示
+├── references/           # 生命周期、视觉、目标原生、自动化验证等方法
+├── templates/            # Markdown 证据模板与 manifest 示例
+├── scripts/              # 确定性项目盘点和清单校验
+└── evals/                # 触发与行为回归用例
+```
 
-功能递归理解：[`project-migration/references/13-功能文档与递归下钻.md`](project-migration/references/13-功能文档与递归下钻.md)
+## 脚本
 
-目标原生重建：[`project-migration/references/11-目标原生重建.md`](project-migration/references/11-目标原生重建.md)
+先查看参数：
 
-多 Agent / 多会话编排：[`project-migration/references/12-多Agent与多会话编排.md`](project-migration/references/12-多Agent与多会话编排.md)
+```bash
+python project-migration/scripts/inspect_frontend_project.py --help
+python project-migration/scripts/validate_migration_manifest.py --help
+```
+
+典型使用：
+
+```bash
+python project-migration/scripts/inspect_frontend_project.py ./legacy-app --format markdown
+python project-migration/scripts/inspect_frontend_project.py ./new-app --format json --output .migration/target-stack.json
+cp project-migration/templates/00-前端迁移清单.json .migration/manifest.json
+python project-migration/scripts/validate_migration_manifest.py .migration/manifest.json --strict
+```
+
+脚本只负责可重复的事实盘点与结构校验；迁移决策仍需要源/目标代码、运行时和产品证据。
+
+## 兼容说明
+
+Skill 名称暂时保留为 `project-migration`，避免破坏已有调用；它的工作重心已经明确收敛为前端项目迁移。
