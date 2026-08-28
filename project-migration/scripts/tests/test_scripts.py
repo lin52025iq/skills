@@ -124,6 +124,21 @@ class ManifestValidatorTests(unittest.TestCase):
             any(issue.level == "error" and issue.path == "rollout" for issue in issues)
         )
 
+    def test_route_reference_to_unknown_scenario_is_error(self) -> None:
+        manifest = copy.deepcopy(self.valid_manifest)
+        manifest["routes"][0]["acceptanceScenarioIds"].append("SCN-DOES-NOT-EXIST")
+
+        issues = validate_manifest(manifest)
+
+        self.assertTrue(
+            any(
+                issue.level == "error"
+                and issue.path.startswith("routes[0].acceptanceScenarioIds")
+                and "unknown scenario" in issue.message
+                for issue in issues
+            )
+        )
+
     def test_removed_capability_restore_requires_approval(self) -> None:
         manifest = copy.deepcopy(self.valid_manifest)
         capability = manifest["capabilities"][1]
