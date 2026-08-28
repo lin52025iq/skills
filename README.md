@@ -50,6 +50,8 @@ project-migration/
 
 ## 脚本
 
+运行要求：Python 3.10+，仅使用标准库。
+
 先查看参数：
 
 ```bash
