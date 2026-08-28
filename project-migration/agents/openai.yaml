@@ -1,0 +1,4 @@
+interface:
+  display_name: "项目迁移"
+  short_description: "迁移系统能力，并优化目标架构与代码质量"
+  default_prompt: "使用 $project-migration 分析并执行这个项目迁移任务，在保持必要业务语义可验证的前提下，按目标项目与目标技术栈的优秀实践完成迁移。"
