@@ -1,545 +1,645 @@
 ---
 name: project-migration
-description: 用于把已有项目或系统中的功能、模块、业务域、服务迁移到另一个项目，并支持跨语言、框架、数据库、架构迁移、遗留设计优化以及大模块的多 Agent / 多会话协作。先把源系统蒸馏为技术无关的业务语义，再研究目标项目的语言、架构、惯例和可复用能力，以目标原生方式重新实现；大任务按独立能力工作流拆分，由 Supervisor 统一协调、Worker 分工实施、Reviewer 独立验收。全过程使用中文。
+description: 专注于前端项目、页面、功能模块和用户体验的跨项目迁移与现代化，支持 React、Vue、Angular、Svelte 等框架之间迁移，以及 SPA、SSR、MPA、微前端、状态管理、路由、组件库和样式体系迁移。先从源前端真实入口递归理解现役功能，识别被注释、隐藏、禁用和废弃能力，建立页面视觉与交互基线，再研究目标项目的前端架构、语言、组件、状态和样式惯例，以目标原生方式 Rebuild，同时要求功能、视觉、响应式和交互与源项目现役体验对齐。大模块支持 Supervisor + Workstreams 多 Agent / 多会话协作。全过程使用中文。
 ---
 
-# 项目迁移
+# 前端项目迁移
 
 ## 1. 角色与最终目标
 
-你是“系统迁移负责人”，不是代码翻译器，也不是文件搬运器。
+你是“前端迁移负责人”，不是代码翻译器、组件搬运器，也不是未经批准的 UI 设计师。
 
-你的目标同时包含两个维度：
+本 Skill 主要服务于：
 
-1. **迁移正确性**：业务能力、公开契约、数据语义、失败语义和必要运行特性得到正确迁移；
-2. **目标原生质量**：目标实现符合目标项目和目标技术栈的优秀实践，不把源项目的目录、类层级、框架习惯、错误设计和技术债原样复制过去。
+- 一个前端项目的页面或功能迁到另一个前端项目；
+- Vue / React / Angular / Svelte 等框架互迁；
+- JavaScript → TypeScript；
+- 老 SPA → 新 SPA / SSR / Router 架构；
+- 老组件库 → 新组件库 / Design System；
+- CSS / Less / Sass / CSS Modules / CSS-in-JS / Tailwind 等样式体系迁移；
+- 状态管理、请求层、权限、路由和构建工具迁移；
+- 微前端拆分、合并或现代化；
+- 在迁移过程中清理废弃功能和不合理前端设计。
 
-迁移成功不以文件数量、代码相似度或构建通过为标准，而以能力覆盖、业务规则覆盖、目标项目一致性、行为差异、设计质量和切换证据为标准。
+后端 API、数据库、消息和任务只在它们影响前端功能、数据契约、权限、状态或页面行为时继续追踪；它们不是本 Skill 的主要实现对象。
+
+迁移成功同时要求：
+
+1. **功能正确**：现役用户能力、业务规则和页面状态没有遗漏；
+2. **生命周期正确**：Deprecated / Removed 功能没有被错误恢复，Conditional 功能没有被误删；
+3. **视觉正确**：未经批准 redesign 时，关键页面布局和视觉结果跟随源项目现役界面对齐；
+4. **交互正确**：Loading、Empty、Error、Disabled、Modal、表单、滚动等状态和反馈符合源行为；
+5. **响应式正确**：源项目真实支持的 viewport / breakpoint 行为得到保留；
+6. **目标原生**：目标代码符合目标前端项目的组件、状态、样式、路由和测试惯例，不是旧框架换语法；
+7. **可验证**：功能、视觉、交互和关键 Accessibility 都有验收证据。
 
 ## 2. 强制语言规则
 
 整个 Skill 的工作语言始终为中文。
 
-- 分析、计划、风险、结论、迁移文档、审查结果和阶段报告全部使用中文；
-- 代码符号、文件路径、接口字段、技术产品名、命令和不可翻译的专有名词保持原样；
-- 引用英文资料后，用中文说明其迁移意义；
-- `.migration/` 下的迁移记录默认使用中文。
+- 分析、计划、风险、功能文档、视觉基线、审查结果和阶段报告全部使用中文；
+- 代码符号、文件路径、Route、CSS selector、技术产品名和命令保持原样；
+- 引用英文资料后，用中文说明迁移意义；
+- `.migration/` 下迁移记录默认使用中文。
 
-## 3. 核心原则
+## 3. 前端迁移默认模型
 
-### 3.1 迁移能力，不迁移文件
-
-优先理解系统做什么、为什么这样做、依赖什么、改变什么状态、失败时如何处理、谁能观察到结果。
-
-目录、类、函数、DTO、Entity、Service、Repository 和表只是实现载体，不能直接当作迁移边界、迁移任务或迁移进度。
-
-### 3.2 默认采用 Research → Review → Rebuild
-
-迁移默认经过：
+默认采用：
 
 ```text
-Research：研究源系统真实行为
-→ Semantic Distillation：蒸馏为技术无关语义
-→ Review Target：研究目标项目和目标技术栈
-→ Target Design：形成目标原生蓝图
-→ Rebuild：按目标设计重新实现
-→ Verify：用源行为和验收裁判验证
+Research Source
+→ Lifecycle Classification
+→ Recursive Feature Discovery
+→ Visual & Interaction Baseline
+→ Semantic Distillation
+→ Review Target Frontend
+→ Target-native Blueprint
+→ Pilot
+→ Rebuild
+→ Functional + Visual + Interaction Verification
 ```
 
-**源代码用于回答“旧系统真实做什么”，不能直接回答“目标代码应该长什么样”。**
-
-详见 `references/11-目标原生重建.md`。
-
-### 3.3 建立语义防火墙
-
-中大型迁移在开始正式实现前，优先形成三个产物：
+也就是：
 
 ```text
+源代码 / 源页面
+↓
+先判断哪些功能现在真的存在
+↓
+递归下钻理解功能和状态
+↓
+记录用户实际看到的页面与交互
+↓
+蒸馏技术无关语义
+↓
+研究目标前端项目怎样组织代码
+↓
+形成目标页面 / 模块蓝图
+↓
+按目标项目方式重建
+↓
+与源现役功能和视觉基线对照
+```
+
+**源代码回答“旧产品现在做什么和长什么样”；目标项目回答“新代码应该怎么写”。**
+
+## 4. 七类前端可观察契约
+
+每个迁移能力都至少检查以下适用项。
+
+### 4.1 功能契约
+
+- 用户能做什么；
+- 功能入口在哪里；
+- 前置条件；
+- 成功 / 失败结果；
+- 业务规则。
+
+### 4.2 导航契约
+
+- Route；
+- Menu / Sidebar / Navbar；
+- Tab；
+- Deep Link；
+- Redirect；
+- Guard / Permission；
+- Modal / Drawer / Popover 入口。
+
+### 4.3 状态契约
+
+至少检查适用的：
+
+```text
+Default
+Loading / Skeleton
+Empty
+Error
+Partial Data
+Disabled
+Read-only
+Hover
+Focus / Focus-visible
+Active / Pressed
+Selected
+Expanded / Collapsed
+Editing
+Validation Error
+Submitting
+Success Feedback
+Permission Denied
+Offline / Timeout
+Long Content / Overflow
+```
+
+### 4.4 交互契约
+
+- Click / Input / Submit；
+- Keyboard；
+- Focus；
+- Scroll；
+- Drag / Drop；
+- Debounce / Throttle；
+- Optimistic Update；
+- Modal close；
+- Unsaved changes；
+- Pagination / Infinite scroll。
+
+### 4.5 视觉契约
+
+- 页面框架；
+- Grid / Flex / Position；
+- 宽高与 max/min；
+- margin / padding / gap；
+- 字体；
+- 颜色；
+- 边框 / 圆角 / 阴影；
+- Icon / Image；
+- z-index；
+- overflow / scroll owner；
+- Theme / Design Token。
+
+### 4.6 响应式契约
+
+- breakpoint；
+- mobile / tablet / desktop 布局变化；
+- hide / show；
+- wrap；
+- navigation transformation；
+- table / card transformation；
+- viewport / container query。
+
+### 4.7 平台与质量契约
+
+- Accessibility；
+- i18n / locale；
+- date / number format；
+- analytics；
+- SEO / metadata；
+- SSR / hydration；
+- asset / font；
+- build / code splitting；
+- 性能和运行错误。
+
+## 5. 功能存在不等于需要迁移
+
+### 5.1 必须建立功能生命周期
+
+仓库中的组件、Route、API 和 CSS 只能证明代码存在，不能证明功能当前仍有效。
+
+每个关键功能分类为：
+
+- **Active**：现役；
+- **Conditional**：条件现役；
+- **Hidden**：默认隐藏但可能可达；
+- **Disabled**：明确关闭但可能恢复；
+- **Deprecated**：有废弃 / 替代证据；
+- **Removed**：产品能力已移除，只剩残留；
+- **Unknown**：证据不足。
+
+详见 `references/14-功能生命周期与废弃识别.md`，使用 `templates/04-功能生命周期清单.md`。
+
+### 5.2 前端必须主动检查这些“非现役信号”
+
+- JSX / TSX 注释块；
+- Vue / Angular / HTML 注释；
+- Route 被注释或未注册；
+- Menu / Tab 被注释；
+- Feature Flag 长期关闭；
+- 永假条件；
+- CSS `display:none` / `hidden`；
+- 权限永不可达；
+- 旧组件已有新替代；
+- deprecated / legacy / old 标记；
+- skip / disabled tests；
+- API 已无调用方。
+
+看到注释代码时：
+
+> 研究它表达过什么功能，但默认不要恢复并迁移。
+
+同时不能因为 UI 被隐藏就直接判定废弃，必须继续查 Route、Flag、权限、替代实现和调用关系。
+
+## 6. 先递归生成功能文档
+
+对源前端先枚举真实入口：
+
+- 页面 Route；
+- Menu / Navigation；
+- Tab；
+- 页面按钮和交互动作；
+- Modal / Drawer；
+- Deep Link；
+- Event / WebSocket；
+- Store action；
+- Background refresh；
+- Micro-frontend entry。
+
+然后沿：
+
+```text
+UI 入口
+→ 条件显示 / 权限
+→ 页面 / 容器逻辑
+→ 状态管理
+→ 数据请求
+→ 业务判断
+→ UI 状态变化
+→ 后续交互 / 页面跳转
+→ 用户最终可观察结果
+```
+
+不断向下研究。
+
+只要仍出现新的功能点、状态、条件、数据语义、交互或副作用就继续；纯 UI plumbing 或无业务意义工具函数可以停止。
+
+先形成：
+
+```text
+.migration/功能文档.md
+.migration/功能生命周期清单.md
+```
+
+再形成：
+
+```text
+.migration/迁移语义规格.md
+```
+
+详见 `references/01-源系统理解.md` 和 `references/13-功能文档与递归下钻.md`。
+
+## 7. 前端视觉基线是正式迁移输入
+
+### 7.1 默认不是 redesign
+
+如果用户没有明确要求重新设计页面：
+
+> **目标代码结构可以重建，目标视觉与交互默认跟随源项目现役页面。**
+
+不能因为：
+
+- 换了 React / Vue；
+- 换了组件库；
+- 换了 CSS 技术；
+- 目标项目有不同默认样式；
+
+就静默改变页面布局和展示。
+
+### 7.2 为关键页面建立基线
+
+使用 `templates/10-前端视觉基线.md`，记录：
+
+- viewport / breakpoint；
+- page shell；
+- header / sidebar / main；
+- 宽高和滚动；
+- Grid / Flex；
+- spacing；
+- font；
+- color；
+- border / radius / shadow；
+- icon / image；
+- UI 状态矩阵；
+- responsive behavior；
+- interaction flow；
+- Accessibility。
+
+优先视觉证据：
+
+```text
+源项目可运行页面真实截图
+→ Storybook / 组件示例
+→ 产品截图 / 设计稿
+→ DOM + CSS + 组件结构
+```
+
+详见 `references/15-前端视觉与交互还原.md`。
+
+## 8. 建立前端语义防火墙
+
+正式实现前优先形成：
+
+```text
+.migration/功能文档.md
+.migration/功能生命周期清单.md
+.migration/前端视觉基线.md
 .migration/迁移语义规格.md
 .migration/目标项目画像.md
 .migration/目标实现蓝图.md
 ```
 
-它们的职责分别是：
+目标实现蓝图不能从源文件树直接生成。
 
-- **迁移语义规格**：记录能力、规则、契约、状态、数据、副作用、失败语义和验证场景，不按源文件结构组织；
-- **目标项目画像**：记录目标项目已有范例、语言/框架惯例、错误/事务/依赖/测试方式和可复用能力；
-- **目标实现蓝图**：只从“语义规格 + 目标项目画像”推导目标模块和代码结构。
-
-源文件树不得直接变成目标实现蓝图。
-
-### 3.4 实施阶段上下文优先级
-
-开始写目标代码后，优先级固定为：
+开始写目标代码后，上下文优先级：
 
 ```text
-1. 目标项目真实代码与优秀范例
+1. 目标前端项目真实代码和优秀范例
 2. 目标实现蓝图
-3. 迁移语义规格
-4. 技术栈迁移规则
-5. 目标技术栈官方/成熟惯例
-6. 源代码：仅用于回答尚未确认的具体事实
+3. 源页面视觉 / 交互基线
+4. 迁移语义规格
+5. 技术栈迁移规则
+6. 源代码：只用于具体事实回查
 ```
 
-需要回看源代码时，先提出具体问题，例如“重复支付回调时是否再次发事件？”，不要以“阅读这个 Service 并迁过去”的方式工作。
+## 9. 目标前端项目必须先研究
 
-新发现的源事实先写回语义规格或业务规则台账，再继续目标实现。
+设计目标页面前至少研究：
 
-### 3.5 禁止默认一对一结构映射
+### 工程
 
-除非有明确业务或契约理由，默认禁止：
+- package manager；
+- bundler / dev server；
+- TypeScript config；
+- module / alias；
+- lint / format；
+- build / deploy；
+- environment config。
 
-- 一个源文件对应一个目标文件；
-- 一个源类对应一个目标类 / struct；
-- 一个源方法对应一个目标函数；
-- 一个源 package/module 对应一个目标 package/module；
-- 一个源 Entity 对应一个目标 Entity；
-- 一个源异常类对应一个目标错误类型；
-- 一个源框架注解对应一个目标框架机制；
-- 批量复制 helper、util、manager、base、abstract 等源实现抽象。
+### 应用架构
 
-稳定领域名称和公开契约名称可以保留；偶然的实现分解没有保留义务。
+- Router；
+- Page / Feature / Module 边界；
+- Server / Client component（如适用）；
+- data fetching；
+- cache；
+- global / local state；
+- form；
+- error boundary；
+- permission。
 
-### 3.6 “不迁移”是合法结论
+### UI
 
-迁移开始前先判断可行性和收益。允许输出：迁移、局部迁移、先解耦再迁移、暂缓、不迁移。
+- Component library；
+- Design System；
+- CSS / styling 技术；
+- Theme；
+- Token；
+- Icon；
+- Typography；
+- Layout component；
+- responsive conventions。
 
-不要因为用户用了“迁移”这个词就默认必须立即实施。
+### 测试
 
-### 3.7 所有重要结论区分三种状态
+- unit / component；
+- Storybook；
+- E2E；
+- visual regression；
+- accessibility testing。
 
-- **证据**：存在直接来源支持；
-- **推断**：有合理依据，但缺少直接证据；
-- **未知**：当前材料不足。
+先找 2～5 个目标项目中维护良好、近期活跃、测试充分的相似页面 / 模块作为范例。
 
-禁止把推断写成事实。高风险未知项必须进入迁移状态。
+## 10. 禁止按源前端结构一对一复制
 
-### 3.8 保留业务语义，不保留错误设计
+除非有明确产品或契约理由，默认禁止：
 
-迁移时把源系统内容分成三类：
+- 一个源 `.vue` → 一个目标 `.tsx`；
+- 一个 Angular Component → 一个 React Component；
+- 一个旧 Page → 按旧组件树完整复刻；
+- 一个 Store module → 一个目标 Store module；
+- 一个旧 mixin / hook → 一个目标 hook；
+- 一个旧 CSS / Less 文件 → 一个目标样式文件；
+- 批量复制 utils / helpers / base components；
+- Controller-shaped React、Angular-shaped React、Vue-shaped React 等结构。
 
-1. **必须保持的业务语义**：默认保持并验证；
-2. **实现设计与技术债**：允许并鼓励在目标实现中受控改进；
-3. **疑似错误业务行为**：不得悄悄修正，必须记录为显式行为差异，经证据或用户确认后再改变。
+允许保持的是产品概念、页面语义、视觉和交互契约，不是旧框架的实现分解。
 
-### 3.9 目标项目惯例优先
+## 11. 样式迁移：视觉保持，CSS 架构可重建
 
-目标设计优先级通常为：
+可以：
+
+- Less / Sass → CSS Modules；
+- CSS → Tailwind；
+- styled-components → 目标项目样式方案；
+- float / clearfix → Grid / Flex；
+- magic values → 目标 Design Token；
+- 老组件库 → 目标组件库。
+
+但要验证：
+
+- 页面布局没有意外变化；
+- 间距和尺寸对齐；
+- 字体和图标对齐；
+- responsive 对齐；
+- Loading / Empty / Error / Disabled 等状态对齐；
+- 新组件库没有静默改变交互。
+
+## 12. 九阶段前端迁移状态机
 
 ```text
-目标项目已有稳定惯例
-→ 目标技术栈成熟惯例
-→ 通用软件设计原则
-→ 源项目实现形式
+阶段 0：前端迁移接入与范围
+    ↓
+阶段 1：源功能发现 + 生命周期判断
+    ↓
+阶段 2：功能文档 + 视觉 / 交互基线
+    ↓
+阶段 3：迁移边界 + 技术无关语义
+    ↓
+阶段 4：目标前端项目研究 + 目标蓝图
+    ↓
+阶段 5：验证裁判 + 试迁移
+    ↓
+阶段 6：目标原生 Rebuild
+    ↓
+阶段 7：功能 + 视觉 + 交互 + Accessibility 审查
+    ↓
+阶段 8：发布、灰度与旧前端清理
 ```
 
-开始设计前，优先找到 2～5 个目标项目中维护良好、近期活跃、测试充分的相关模块作为范例。
+### 阶段门禁
 
-不要为了套用 Clean Architecture、DDD、微服务或其他流行模式增加无必要复杂度。
+| 阶段 | 前端关键退出条件 |
+|---|---|
+| 0 | 页面 / 功能范围、源与目标技术栈、是否允许 redesign、浏览器/设备范围明确 |
+| 1 | 关键页面和入口已发现；功能生命周期已分类；注释 / 隐藏 / Flag / 权限已检查 |
+| 2 | 功能树完整；关键页面有视觉基线；主要 UI 状态与 responsive 行为有记录 |
+| 3 | Active / Conditional 能力有明确迁移去向；Deprecated / Removed 有不迁移证据；语义规格不依赖源组件结构 |
+| 4 | 已研究目标前端范例、组件、状态、样式、路由、测试；目标蓝图不是源组件树投影 |
+| 5 | 关键功能有功能裁判；关键页面有视觉裁判；高风险页面完成试迁移 |
+| 6 | 实现主要依据目标项目范例、蓝图和视觉基线；源代码只做事实回查 |
+| 7 | 功能、视觉、交互、响应式、关键 Accessibility 通过；无阻断 Copy-Smell |
+| 8 | 新页面真实可用；旧 Route / component / CSS / Flag / asset 清理条件满足 |
 
-### 3.10 先建立裁判，再扩大迁移
+## 13. 前端验证裁判
 
-大规模实施前必须有“如何证明迁移正确”的裁判，例如公共接口测试、契约测试、端到端测试、新旧行为对照、数据一致性校验或明确的人工验收协议。
+不能只跑 unit test。
 
-裁判应先在旧实现上验证，并尽可能确认它能识别故意制造的错误。
+按风险组合：
 
-### 3.11 先试迁移，再批量迁移
+### 功能
 
-跨技术栈、重设计或高风险迁移，在正式批量实施前选择少量最困难、最有代表性的能力做可丢弃试迁移。
+- component test；
+- integration；
+- E2E；
+- API mock / contract；
+- old/new behavior comparison。
 
-试迁移重点验证语义规格是否充分、目标项目画像是否正确、目标蓝图是否原生、技术栈规则和验收裁判是否有效。
+### 视觉
 
-### 3.12 重复失败说明方法需要修正
+- 页面截图基线；
+- component screenshot；
+- Storybook visual test；
+- Playwright `toHaveScreenshot()` 等现有项目能力；
+- 人工视觉确认。
 
-同类失败反复出现时，停止机械修实例，检查上游的源理解、语义规格、边界、目标项目画像、目标蓝图、迁移规则或任务拆分。
+视觉比较尽量固定 browser、OS/rendering environment、viewport、字体、locale、theme、数据和 animation；环境不同产生的像素差异不要误判为产品差异。
 
-如果规则发生变化，重新检查所有可能受影响的已完成迁移单元。
+### 交互
 
-### 3.13 旧实现不要过早删除
+- hover / focus；
+- keyboard；
+- form validation；
+- modal / drawer；
+- loading / empty / error；
+- permission；
+- scroll；
+- responsive navigation。
 
-旧实现尽可能保持可运行，直到关键行为对照、切换和数据处理完成。部署新代码不代表可以清理旧路径。
+### 差异分类
 
-### 3.14 大模块优先考虑 Supervisor + Workstreams
+所有差异归类：
 
-当迁移模块可以按独立业务能力、数据边界、集成边界或验证工作拆分时，不要让单个 Agent 在一个超长上下文中承担全部任务。
+- 必须修复；
+- 批准的产品 / 视觉变化；
+- 环境噪声；
+- Unknown。
 
-优先采用：
+不要通过无限扩大视觉 diff threshold 掩盖真实回归。
+
+## 14. 前端多 Agent / 多会话
+
+大前端项目优先按稳定产品能力拆 Workstream，而不是按目录平均分。
+
+推荐角色：
+
+- Route / Navigation / Lifecycle Research Worker；
+- Page Feature Research Worker；
+- Visual Baseline Worker；
+- Data / State / API Worker；
+- Page Group Implementation Worker；
+- Responsive / Interaction Worker；
+- Visual Regression Reviewer；
+- Accessibility / Copy-Smell Reviewer。
+
+示例：
 
 ```text
-Supervisor / 主会话
-→ 拆分 Workstreams
-→ 多个 Worker Agent / 独立对话执行
-→ 独立 Reviewer
-→ Supervisor 集成与最终 Gate
+Supervisor
+├── WS-FE-01 路由与功能生命周期
+├── WS-FE-02 订单页面功能和状态
+├── WS-FE-03 订单页面视觉基线
+├── WS-FE-04 请求层 / 状态模型
+├── WS-FE-05 页面 Rebuild
+└── WS-FE-06 Visual + Interaction Review
 ```
 
-Agent 数量由**独立工作流数量**决定，不由文件数量决定。
-
-强耦合、共享同一核心文件、共享不稳定契约的任务不要为了并行强行拆分。
+同一核心页面、共享 Route、全局 Store、Theme、Design Token 默认使用单写者。
 
 详见 `references/12-多Agent与多会话编排.md`。
 
-## 4. `.migration/` 长期记忆与工作区
+## 15. `.migration/` 前端工作区
 
-中大型迁移优先在目标项目维护：
+中大型前端迁移优先维护：
 
 ```text
 .migration/
 ├── 迁移上下文.md
-├── 可行性评估.md
 ├── 当前状态.md
 ├── 源系统理解.md
+├── 功能文档.md
+├── 功能生命周期清单.md
+├── 前端视觉基线.md
 ├── 迁移语义规格.md
 ├── 业务规则台账.md
 ├── 能力迁移矩阵.md
-├── 依赖与副作用.md
 ├── 迁移边界.md
 ├── 目标项目画像.md
-├── 目标架构映射.md
 ├── 目标实现蓝图.md
 ├── 技术栈迁移规则.md
 ├── 设计改进台账.md
 ├── 迁移计划.md
-├── 多Agent编排总览.md       # 大模块 / 多会话时
-├── 试迁移报告.md
-├── 决策记录.md
-├── 风险与未知项.md
+├── 多Agent编排总览.md
 ├── 差异与失败队列.md
 ├── 验证报告.md
-├── 切换与回滚.md
-│
-├── workstreams/              # 多 Agent / 多会话的局部工作包与交接
-│   └── WS-XXX-name/
-│       ├── 工作包.md
-│       ├── 状态.md
-│       ├── 发现.md
-│       ├── 验证.md
-│       ├── 交接.md
-│       └── 审查.md
-├── scripts/                  # 必要时：迁移专用辅助脚本
-├── tests/                    # 必要时：迁移专用验证、对照、契约测试
-├── fixtures/                 # 可选：脱敏测试输入和黄金样本
-└── results/                  # 可选：机器生成验证结果
+└── 切换与回滚.md
 ```
 
-不要求一次创建全部文件或子目录，只创建当前阶段真正需要的内容。
-
-### 4.1 根目录保持声明式
-
-`.migration/` 根目录只保存事实、状态、决策、规则、计划和验证结论。
-
-禁止把 `.js`、`.cjs`、`.mjs`、`.ts`、`.py`、`.sh`、`.ps1`、Java、Go、Rust、C# 等可执行源码，以及 `package.json`、`node_modules/`、虚拟环境、构建产物直接堆在根目录。
-
-必要辅助代码进入 `.migration/scripts/` 或 `.migration/tests/`。详见 `references/10-.migration目录边界.md`。
-
-### 4.2 默认不为“理解代码”创建脚本
-
-优先使用宿主 Agent 已有的搜索、符号导航、Git、构建、测试、Schema、接口定义和代码阅读能力。
-
-只有辅助程序能明显提高确定性、可重复性或验证质量时才创建，例如行为对照、数据校验、Schema/契约比较和可重复迁移操作。
-
-### 4.3 辅助代码有明确生命周期
-
-迁移结束时，一次性代码删除；长期有价值的测试迁入正式 `tests/`；长期工具迁入正式 `tools/` 或 `scripts/`。
-
-### 4.4 Workstreams 是局部状态，不是第二套全局真相
-
-多 Agent / 多会话时：
-
-- 根目录中的语义规格、目标画像、蓝图、技术规则和关键业务规则由 Supervisor 统一维护；
-- Worker 默认把全局产物视为只读；
-- Worker 的发现、验证和变更建议写入自己的 `.migration/workstreams/WS-XXX/`；
-- 需要修改全局语义、蓝图或规则时，由 Worker 提案，Supervisor 合并；
-- 不允许多个 Worker 同时直接修改全局迁移文档造成真相漂移。
-
-## 5. 九阶段状态机
+必要时：
 
 ```text
-阶段 0：可行性与迁移接入
-    ↓
-阶段 1：源系统研究与语义蒸馏
-    ↓
-阶段 2：迁移边界
-    ↓
-阶段 3：目标项目研究与目标原生架构
-    ↓
-阶段 4：目标实现蓝图、迁移规则与实施计划
-    ↓
-阶段 5：验证裁判、安全网与试迁移
-    ↓
-阶段 6：目标原生 Rebuild 与受控现代化
-    ↓
-阶段 7：行为验证、Copy-Smell 与质量审查
-    ↓
-阶段 8：切换、回滚与清理
+.migration/workstreams/
+.migration/tests/
+.migration/fixtures/
+.migration/results/
+.migration/scripts/
 ```
 
-新证据可以使流程返回前一阶段。不要为了维持原计划而忽略事实。
-
-## 6. 阶段门禁与路由
-
-| 阶段 | 关键退出条件 | 需要时读取 |
-|---|---|---|
-| 0 可行性与接入 | 有明确迁移结论、目标、范围、约束、成功标准 | `references/00-项目迁移方法论.md` |
-| 1 源研究与语义蒸馏 | 关键行为有证据；已形成不依赖源目录/类结构的语义规格 | `references/01-源系统理解.md`、`references/11-目标原生重建.md` |
-| 2 迁移边界 | 每个关键能力有目标去向，数据所有权和临时连接方式明确 | `references/02-边界与架构.md` |
-| 3 目标项目与架构 | 已研究目标范例、语言/框架惯例和可复用能力；目标架构不是源结构投影 | `references/02-边界与架构.md`、`references/09-设计现代化与代码质量.md`、`references/11-目标原生重建.md` |
-| 4 蓝图、规则与计划 | 目标实现蓝图由语义规格和目标项目画像推导；任务按能力而非源文件拆分；大模块已有 Workstream DAG | `references/03-计划与状态.md`、`references/07-跨技术栈迁移.md`、`references/11-目标原生重建.md`、`references/12-多Agent与多会话编排.md` |
-| 5 裁判与试迁移 | 高风险能力已验证目标设计和技术栈表达；Copy-Smell 可被发现 | `references/05-验证与审查.md`、`references/11-目标原生重建.md` |
-| 6 Rebuild | 目标实现主要依据目标项目范例和蓝图；源代码仅用于具体事实回查；并行 Worker 所有权不冲突 | `references/04-增量实施.md`、`references/11-目标原生重建.md`、`references/12-多Agent与多会话编排.md` |
-| 7 验证与审查 | 阻断行为差异关闭；无明显源结构复制；多 Workstream 已完成跨工作包集成验证 | `references/05-验证与审查.md`、`references/08-最终检查清单.md`、`references/09-设计现代化与代码质量.md`、`references/11-目标原生重建.md`、`references/12-多Agent与多会话编排.md` |
-| 8 切换与清理 | 真实流量和数据安全转移；回滚、稳定性和清理条件满足 | `references/06-切换与回滚.md` |
-
-门禁是退出条件，不是“看过即可”的清单。阻断条件不满足时不得跳阶段。
-
-## 7. 目标原生 Rebuild 硬规则
-
-### 7.1 任务按能力拆分，不按源文件拆分
-
-禁止创建：
-
-```text
-迁移 OrderService.java
-迁移 OrderRepository.java
-迁移 OrderUtils.java
-```
-
-应改成：
-
-```text
-实现“创建订单”用例
-实现“取消订单”规则
-接入订单持久化与事务语义
-接入 OrderCreated 事件并验证幂等
-```
-
-源文件只能作为证据位置，不能成为迁移任务目标。
-
-### 7.2 先找目标范例再写代码
-
-每个重要迁移单元实施前，先明确目标项目中要参考的模块、文件或模式，以及具体复用哪些惯例。
-
-如果找不到单个完整范例，可以分别寻找模块组织、数据访问、错误处理和测试方式的范例。
-
-### 7.3 发现 Copy-Smell 必须暂停
-
-典型 Copy-Smell：
-
-- 目标目录树与源目录树高度相似；
-- 大量非领域类名、方法名被原样保留；
-- 一个源 Service 被整体改写成一个目标 Service；
-- DTO / Entity / VO 层级被完整复制；
-- helper / util 被批量迁入；
-- 目标项目已有能力却重新建设；
-- 目标代码的错误、事务、日志、配置、测试方式与目标项目其他模块不一致；
-- 熟悉目标技术栈的开发者会认为代码“像另一种语言写出来的”。
-
-发现 Copy-Smell 时先修语义规格、目标项目画像、蓝图或迁移规则，再修代码。
-
-### 7.4 目标语言必须真正被使用
-
-跨语言迁移至少确认目标语言的数据建模、错误处理、资源生命周期、并发/取消、模块可见性、组合方式、标准库和测试惯例。
-
-不要生成 Java-shaped Go、Spring-shaped TypeScript、Angular-shaped React 等“换语法但没换模型”的代码。
-
-### 7.5 大模块先拆 Workstreams，再决定是否并行
-
-大模块先基于能力 DAG 拆成工作包，再判断哪些工作包真正独立。
-
-每个工作包必须有：目标能力、全局只读上下文、目标范例、前置依赖、修改所有权、禁止修改范围、验收条件和交接格式。
-
-默认：
-
-- Supervisor 持有全局语义、蓝图和规则；
-- Worker 只实现自己的工作包；
-- Reviewer 与 Implementer 尽量分离；
-- 同一正式文件、核心 Schema 或共享契约优先只有一个写入所有者；
-- 工作包之间依赖不稳定时顺序执行，不强行并行；
-- 支持原生 subagent、agent team，也支持多个独立对话用 `.migration/workstreams/` 交接。
-
-## 8. 受控现代化规则
-
-目标代码不仅要能工作，还应清晰、可维护、可测试，并融入目标项目。
-
-主动识别：过大模块、业务规则散落、跨层/循环依赖、数据模型和框架泄漏、隐式全局状态、事务/副作用/错误边界不清、重复基础设施、失效兼容逻辑、非目标语言惯用写法。
-
-每项设计改进记录到 `.migration/设计改进台账.md`，至少说明源问题证据、目标原则、是否改变可观察行为、验证方式和状态。
-
-设计改进分为：
-
-- **必须改**：不改会污染目标架构、阻碍验证或引入明显风险；
-- **应该改**：能显著提升清晰度、可测试性或可靠性且风险可控；
-- **后续改**：与本次迁移关系弱，当前处理会扩大范围。
-
-禁止把“最佳实践”理解为增加更多层、接口、模式或抽象。
-
-## 9. AI 自主理解规则
-
-大型仓库优先：
-
-```text
-定位能力范围
-→ 找真实入口
-→ 沿调用、数据和副作用路径扩展
-→ 反向查找调用者和旁路实现
-→ 用测试、配置和数据库约束补齐
-→ 主动寻找反证
-→ 蒸馏为迁移语义规格
-```
-
-所有高价值结论尽量追踪到文件、符号、测试、契约、表、约束、配置或运行证据。
-
-源研究结束后，不继续以源文件为浏览主线。进入目标阶段后，浏览主线切换到目标项目范例和目标实现蓝图。
-
-## 10. 多 Agent / 多会话 Supervisor 协议
-
-当任务满足拆分条件时，Supervisor 应主动考虑委派，而不是继续扩张自己的上下文。
-
-### 10.1 可拆分角色
-
-可以根据任务创建：
-
-- 源业务行为 Research Worker；
-- 数据 / Schema / 事务 Research Worker；
-- 集成 / 事件 / Job Research Worker；
-- 目标项目范例 Research Worker；
-- 按业务能力拆分的 Implementation Worker；
-- 行为对照 / 数据验证 Worker；
-- Copy-Smell / 目标原生 Reviewer。
-
-### 10.2 Worker 启动前必须有工作包
-
-使用 `templates/17-子Agent工作包.md`。
-
-Worker 不能只拿一句“你去迁订单模块”。
-
-### 10.3 多对话也使用同一协议
-
-如果没有原生 subagent：
-
-1. Supervisor 创建 `.migration/workstreams/WS-XXX/工作包.md`；
-2. 新对话读取该工作包和其中列出的全局只读文档；
-3. Worker 只处理自己的所有权范围；
-4. 完成后写 `交接.md`；
-5. Supervisor 读取交接、处理全局变更提案并统一集成。
-
-### 10.4 Worker 不直接改全局真相
-
-并行时，语义规格、目标项目画像、目标实现蓝图、技术栈规则和关键业务规则由 Supervisor 合并。
-
-Worker 若发现全局错误，提出：
-
-- `SEMANTIC-CHANGE-PROPOSAL`；
-- `BLUEPRINT-CHANGE-PROPOSAL`；
-- `RULE-CHANGE-PROPOSAL`；
-- `OWNERSHIP-CHANGE-PROPOSAL`。
-
-### 10.5 每批次统一集成
-
-单个 Worker 验证通过不代表批次完成。Supervisor 必须做跨工作包集成测试、共享契约检查、Copy-Smell 审查和状态回写，再释放下一批工作包。
-
-详细方法见 `references/12-多Agent与多会话编排.md`。
-
-## 11. 迁移进度必须可核对
-
-优先报告带分母的状态：
-
-- 关键能力：已验证 / 需要迁移；
-- 高优先级业务规则：已验证 / 总数；
-- 目标原生蓝图：已审查 / 需要实现的能力；
-- 设计改进：已完成 / 决定本次处理；
-- Workstreams：Integrated / 总数；
-- Ready / Running / Blocked 工作包数量；
-- 未关闭行为差异数量；
-- Copy-Smell 阻断数量；
-- 阻断未知项数量；
-- 待迁移任务数量。
-
-分母仍未知时明确写“尚未完成盘点”。
-
-## 12. 独立审查模式
-
-高风险任务完成后或进入阶段 7 时，暂停扩展实现，以“目标项目维护者”视角审查：
-
-1. **源 → 目标**：有没有漏掉能力、规则、契约和副作用；
-2. **目标 → 源**：有没有未经批准的新行为；
-3. **目标原生性**：如果不知道源系统结构，这份代码在目标项目里仍然自然吗；
-4. **Copy-Smell**：是否存在一对一文件、类、方法、DTO/Entity 或框架模式映射；
-5. **技术栈惯用性**：语言、错误、事务、并发、依赖、测试方式是否符合目标生态；
-6. **设计质量**：有没有复制坏设计或反过来过度设计；
-7. **多 Agent 集成**：工作包之间是否出现重复能力、契约漂移、共享文件冲突或不一致设计；
-8. **验证质量**：测试是否真的能发现错误。
-
-审查发现必须写回迁移状态或差异队列。
-
-## 13. 完成定义
-
-只有同时满足以下条件才允许声明“迁移完成”：
-
-- 迁移范围内关键能力都有明确终态；
-- 需要迁移的关键能力均已实现并验证；
-- 高优先级业务规则有目标实现和验证证据；
-- 公开接口、事件和数据契约满足既定兼容要求；
-- 关键失败路径、权限、安全、事务和数据一致性已验证；
-- 目标实现蓝图来自语义规格和目标项目画像，而不是源文件映射；
-- 目标代码符合目标项目主要架构和编码惯例；
-- 没有未解释的一对一源结构复制或阻断级 Copy-Smell；
-- 多 Workstream 迁移已完成统一集成验证；
-- Worker 提出的全局语义 / 蓝图 / 规则变更已处理；
-- 重要技术栈语义差异已处理；
-- 本次“必须改”设计问题全部关闭；
-- 没有未解释的阻断级行为差异；
-- 切换、回滚和数据权威清晰；
-- 临时迁移设施有清理条件；
-- `.migration/scripts/` 和 `.migration/tests/` 中辅助代码已有删除、迁移或保留决策；
-- `.migration/当前状态.md` 与实际仓库一致。
-
-## 14. 快速任务缩减
-
-纯机械、低风险、小范围迁移可以缩减 `.migration/`，并通常无需多 Agent。
-
-跨语言、跨框架或迁入不同架构项目时，至少仍要完成：
-
-- 需要保持的行为；
-- 目标项目范例；
-- 目标技术栈惯例；
-- 是否存在源结构 Copy-Smell；
-- 验证方式。
-
-出现多个可独立能力、大量上下文、多模块实现或明显可并行工作流时，评估是否升级为 Supervisor + Workstreams。
-
-## 15. 参考文档路由
-
-不要一次性读取全部 references。按当前决策点加载：
-
-- `references/00-项目迁移方法论.md`：整体方法论、社区经验、试迁移、失败反馈与渐进现代化；
-- `references/01-源系统理解.md`：五轮理解、证据和反证；
-- `references/02-边界与架构.md`：迁移边界、能力分类和目标架构；
-- `references/03-计划与状态.md`：依赖顺序、任务拆分和状态；
-- `references/04-增量实施.md`：小批量实施、事实回流和改动控制；
-- `references/05-验证与审查.md`：验证裁判、行为对照和独立审查；
-- `references/06-切换与回滚.md`：灰度、数据权威、回滚和清理；
-- `references/07-跨技术栈迁移.md`：语言、框架、数据库和中间件语义；
-- `references/08-最终检查清单.md`：最终验收；
-- `references/09-设计现代化与代码质量.md`：保持业务语义同时改善错误设计；
-- `references/10-.migration目录边界.md`：工作区、脚本测试目录、依赖和清理规则；
-- `references/11-目标原生重建.md`：语义防火墙、目标项目画像、Rebuild、Copy-Smell 和禁止源结构驱动实现；
-- `references/12-多Agent与多会话编排.md`：Supervisor、Workstreams、所有权、并行 Gate、多对话交接和集成协议。
-
-## 16. 模板
-
-只在需要生成对应产物时读取 `templates/`。
-
-跨技术栈或不同项目迁移时优先使用：
-
-- `templates/05-迁移语义规格.md`；
+`.migration/` 根目录保持声明式；可执行代码只进入受控子目录。详见 `references/10-.migration目录边界.md`。
+
+## 16. 前端完成定义
+
+只有同时满足以下条件，才允许声明迁移完成：
+
+- Active / Conditional 关键功能都有明确终态；
+- Deprecated / Removed 功能没有被错误恢复；
+- Hidden / Disabled / Unknown 功能已有明确决策；
+- 页面、Route、Menu、Deep Link 和权限可达性符合要求；
+- 关键业务功能已验证；
+- Loading / Empty / Error / Disabled 等关键 UI 状态已验证；
+- 主要交互流程已验证；
+- 源项目真实支持的主要 viewport / breakpoint 已验证；
+- 未经批准 redesign 的页面与视觉基线对齐；
+- 字体、Icon、图片、Theme、关键 spacing 无未解释漂移；
+- 目标实现符合目标项目组件、路由、状态、样式和测试惯例；
+- 无阻断级源框架 Copy-Smell；
+- Accessibility 阻断项关闭或明确接受；
+- visual diff 均已修复、批准或解释；
+- 多 Workstream 已完成统一集成验证；
+- 临时迁移代码和旧前端路径有清理决策；
+- `.migration/当前状态.md` 与实际前端项目一致。
+
+构建通过、页面能打开、API 能请求，都不能单独作为完成依据。
+
+## 17. 参考文档路由
+
+前端迁移优先读取：
+
+- `references/01-源系统理解.md`：源代码递归理解；
+- `references/13-功能文档与递归下钻.md`：功能树和下钻停止条件；
+- `references/14-功能生命周期与废弃识别.md`：注释、隐藏、禁用、废弃和替代功能；
+- `references/15-前端视觉与交互还原.md`：布局、视觉、响应式、UI 状态和视觉验收；
+- `references/11-目标原生重建.md`：目标项目驱动 Rebuild 和 Copy-Smell；
+- `references/07-跨技术栈迁移.md`：语言 / 框架语义；
+- `references/09-设计现代化与代码质量.md`：受控现代化；
+- `references/12-多Agent与多会话编排.md`：Supervisor / Workstreams；
+- `references/05-验证与审查.md`：验证裁判；
+- `references/08-最终检查清单.md`：最终总体验收；
+- `references/10-.migration目录边界.md`：工作区约束。
+
+其他 references 只在前端依赖确实涉及对应系统能力时读取。
+
+## 18. 模板路由
+
+源前端研究优先使用：
+
+- `templates/04-功能文档.md`；
+- `templates/04-功能生命周期清单.md`；
+- `templates/05-迁移语义规格.md`。
+
+视觉和目标设计优先使用：
+
+- `templates/10-前端视觉基线.md`；
 - `templates/10-目标项目画像.md`；
 - `templates/12-目标实现蓝图.md`。
 
-大模块、多 Agent 或多对话时使用：
+大模块、多 Agent / 多对话使用：
 
 - `templates/16-多Agent编排总览.md`；
 - `templates/17-子Agent工作包.md`；
 - `templates/18-子Agent交接.md`。
 
-模板用于统一事实和状态，不要求机械填满所有字段。
+最终验证使用：
+
+- `templates/23-验证报告.md`；
+- `templates/24-切换与回滚.md`。
+
+模板用于统一证据和状态，不要求机械填满所有字段。
