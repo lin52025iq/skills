@@ -185,6 +185,39 @@
       ],
       "visual": true,
       "accessibility": true
+    },
+    {
+      "id": "SCN-ORDER-ERROR",
+      "capabilityId": "CAP-ORDER-001",
+      "title": "订单请求失败",
+      "role": "orders-reader",
+      "fixture": "fixtures/api/orders-error.json",
+      "steps": [
+        "打开 /orders",
+        "触发订单接口失败"
+      ],
+      "assertions": [
+        "显示可恢复的 Error 状态",
+        "Retry 可重新发起请求"
+      ],
+      "visual": true,
+      "accessibility": true
+    },
+    {
+      "id": "SCN-ORDER-DENIED",
+      "capabilityId": "CAP-ORDER-001",
+      "title": "无订单读取权限",
+      "role": "user-without-orders-read",
+      "fixture": "fixtures/api/orders-default.json",
+      "steps": [
+        "直接打开 /orders"
+      ],
+      "assertions": [
+        "显示权限拒绝状态或按产品规则重定向",
+        "不会发送受保护订单请求"
+      ],
+      "visual": true,
+      "accessibility": true
     }
   ],
   "verification": {
