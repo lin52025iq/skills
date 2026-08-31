@@ -1,3 +1,17 @@
+# Skills
+
+本仓库用于维护面向 AI 编程代理的迁移类 Skills。
+
+## code-migration
+
+`code-migration` 面向一个或多个现有项目向目标项目的功能迁移、融合与重构，强调先理解源项目真实行为与业务规则，再依据用户迁移意图和目标仓库架构进行目标原生实现。
+
+它不把迁移等价为文件搬运或框架语法翻译，而是按功能语义、目标架构和可验证切片逐步推进，支持多项目融合、Layout-first、代表性切片、Codemod 边界、渐进切流与遗留清理。
+
+主入口：[`code-migration/SKILL.md`](code-migration/SKILL.md)
+
+---
+
 # 前端项目迁移 Skill
 
 `project-migration` 是面向 AI 编程代理的前端迁移执行 Skill。它覆盖从只读审计、迁移规划、跨框架实施，到视觉回归、渐进切流、回滚和旧实现清理的完整闭环。
