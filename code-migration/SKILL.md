@@ -25,6 +25,8 @@ description: 用于将一个或多个现有项目中的功能、业务规则和�
 6. **一次只保持一个主要迁移焦点。** 迁移发现的问题不等于必须立即修复；范围外问题进入 Deferred。
 7. **先有可验证切片，再扩大范围。** 大迁移优先做代表性切片验证目标架构和迁移规则。
 8. **迁移完成不是“新代码能跑”。** 目标能力完成后，还要处理切流、临时结构、旧入口、旧依赖和遗留清理。
+9. **迁移状态必须可跨对话恢复。** 长周期迁移把必要上下文持久化到目标仓库根目录 `.code-migration/`，新对话先恢复状态再继续。
+10. **关键不确定性要显式澄清。** 会改变产品行为、业务规则、权限、数据语义或不可逆架构方向的问题不得静默猜测。
 
 ## 2. 适用场景
 
@@ -212,7 +214,21 @@ Source C ─┘
 
 详见 `references/08-验证切流与遗留清理.md`。
 
-## 8. 当前迁移焦点
+## 8. Migration Workspace 与当前迁移焦点
+
+复杂或长周期迁移的运行文档默认写入目标仓库根目录：
+
+```text
+<target-repo>/.code-migration/
+```
+
+`00-迁移状态总览.md` 是跨对话入口；其他模板按需实例化。功能或模块只有在具备独立规划、验证、决策或跨会话维护价值时，才拆到：
+
+```text
+.code-migration/modules/<module>/
+```
+
+不要按源仓库目录树机械拆文档。
 
 长周期任务中，Agent 在任何时刻都必须能说明：
 
@@ -263,19 +279,87 @@ Next Candidate
 - 使用目标架构，而非复制源结构；
 - 对应测试/运行验证通过或已记录基线差异；
 - 没有静默扩大 Scope；
-- 新发现已反馈到后续迁移模型。
+- 新发现已反馈到后续迁移模型；
+- 当前执行计划和 `00-迁移状态总览.md` 已同步本 Slice 的真实状态。
 
-## 10. Migration Learning Loop
+## 10. Clarification Loop
+
+遇到不清晰信息先分类：
+
+- `MUST_ASK`：答案会改变产品行为、业务规则、范围、权限、数据语义、目标架构或不可逆实现方向；
+- `CAN_INFER`：可依据高等级证据、目标项目惯例或明确默认值安全推断；
+- `CAN_DEFER`：不阻塞当前 Slice，可以延后。
+
+处理规则：
+
+1. 将问题写入 `.code-migration/00-迁移状态总览.md` 的待澄清问题；
+2. 每轮只优先询问最阻塞当前 Slice 的少量问题；
+3. 用户回答后立即更新状态总览、功能清单、Decision 和 Ready Gate；
+4. 若答案仍不足，允许继续下一轮提问；
+5. `MUST_ASK` 未解决时，对应 Slice 通常保持 `BLOCKED`；
+6. 若用户明确接受某个默认行为或风险，将其记录为 Decision 后可继续；
+7. 新对话先恢复历史问题和答案，不重复询问已明确事项。
+
+不要把“可以继续其他不依赖此问题的工作”误解为“可以对该 Unknown 随便选择一个实现”。
+
+## 11. Session Handoff Gate
+
+以下任一情况发生时，必须执行会话交接：
+
+- 当前 Slice 通过 Done Gate；
+- 准备结束当前对话或暂停迁移；
+- 准备切换 Agent、开发者或新会话；
+- 当前工作被 `MUST_ASK` 阻塞且需要等待用户决策；
+- 发现 `.code-migration/` 与真实代码/Git 状态不一致。
+
+交接前必须同步：
+
+```text
+Overall Goal
+Current Phase / Module / Slice
+Last Completed Action
+Current Code State
+Tests / Validation
+NOW / READY / BLOCKED / DEFERRED / DONE
+Open Questions + 用户已回答结论
+Uncommitted / Pending Work
+Relevant Decisions
+Recommended Next Action
+Files / Modules To Read First
+```
+
+最低要求：
+
+1. 更新当前模块执行计划；
+2. 更新 `.code-migration/00-迁移状态总览.md`；
+3. 记录最近验证结果和未完成代码状态；
+4. 记录下一推荐 Slice 以及为什么是它；
+5. 如果有未提交改动，明确文件范围、是否可继续修改、是否有半完成行为；
+6. 如果文档与代码状态无法确认一致，将状态标为 `RECONCILE_REQUIRED`，不得伪装成可直接续接。
+
+### 新对话恢复
+
+新的 Agent / 新对话继续迁移时：
+
+1. 第一入口读取 `.code-migration/00-迁移状态总览.md`；
+2. 恢复 Overall Goal、Current Slice、Decision、已回答问题和下一步；
+3. 读取当前模块的功能清单与执行计划；
+4. 检查 Git 状态、最近相关提交和当前 Slice 的实际代码；
+5. 若文档与代码一致，直接从 Recommended Next Action 续接；
+6. 若发现不一致，先做最小范围 Reconcile：确定哪些代码已完成、哪些未验证、哪些文档过期，并更新状态后再写新代码；
+7. 不默认重新扫描所有源项目，不重复开发 `DONE` 项，也不重复询问已有答案。
+
+## 12. Migration Learning Loop
 
 每完成一个代表性切片执行：
 
 ```text
-Understand → Implement → Verify → Learn → Update Model → Next Slice
+Understand → Implement → Verify → Learn → Update Model → Handoff → Next Slice
 ```
 
 如果第一个切片证明最初的目标架构假设、字段映射、状态模型、组件选择或测试方式不对，先更新迁移模型和后续计划，再继续批量实施。不要把同一种错误复制到更多页面后再统一修复。
 
-## 11. 自动化约束
+## 13. 自动化约束
 
 Codemod、正则替换或批量脚本仅用于可证明的 Mechanical 变化。自动化修改应同时给出：
 
@@ -287,7 +371,7 @@ What / Why / Evidence / Scope / Expected Change / Validation / Rollback
 
 详见 `references/07-自动化与增量实施.md`。
 
-## 12. 禁止的迁移方式
+## 14. 禁止的迁移方式
 
 - 不按文件一一迁移；
 - 不按源目录树创建目标目录树；
@@ -298,29 +382,32 @@ What / Why / Evidence / Scope / Expected Change / Validation / Rollback
 - 不同时铺开大量半成品页面或功能；
 - 不以“改了多少文件”衡量迁移进度；
 - 不以 build 通过作为唯一完成标准；
-- 不通过放宽测试阈值、删除断言或隐藏错误证明迁移成功。
+- 不通过放宽测试阈值、删除断言或隐藏错误证明迁移成功；
+- 不在结束会话前留下无法解释的半完成状态；
+- 不在新对话中跳过 `.code-migration/` 恢复步骤直接重新开发。
 
-## 13. 文档强度按规模自适应
+## 15. 文档强度按规模自适应
 
 文档用于保存影响迁移的事实，不是迁移目的：
 
 | 范围 | 默认产物 |
 |---|---|
 | 单组件/小 Hook | 对话内功能契约、目标实现与验证即可 |
-| 单页面 | 功能清单 + 简化执行计划 |
-| 业务模块 | 上下文 + 功能清单 + 执行计划 |
-| 多项目融合 | 五个模板按需完整使用 |
-| 整应用迁移 | 完整上下文、融合映射、决策记录、执行队列与切流清理计划 |
+| 单页面 | `00-迁移状态总览` + 功能清单 + 简化执行计划 |
+| 业务模块 | 状态总览 + 上下文 + 功能清单 + 执行计划 |
+| 多项目融合 | 六个模板按需完整使用 |
+| 整应用迁移 | 完整上下文、融合映射、决策记录、模块执行队列、交接与切流清理计划 |
 
-不要为了形式机械创建全部模板。
+不要为了形式机械创建全部模板。即使小任务不创建完整文档，只要进入跨对话/长周期迁移，就必须有可恢复的状态入口。
 
-## 14. 结束报告
+## 16. 结束报告
 
 实施或审查结束时至少说明：
 
 1. 总体目标与本轮实际完成的能力；
 2. 当前处于 `MIGRATED` 还是 `ELIMINATED`；
 3. 验证证据与已知差异；
-4. Blocked / Deferred / Unknown；
+4. Blocked / Deferred / Unknown / MUST_ASK；
 5. Temporary Architecture 和清理条件；
-6. 下一推荐 Slice 及其选择原因。
+6. 下一推荐 Slice 及其选择原因；
+7. `.code-migration/00-迁移状态总览.md` 是否已完成交接同步。
