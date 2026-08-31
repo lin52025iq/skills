@@ -1,0 +1,4 @@
+interface:
+  display_name: "代码迁移"
+  short_description: "按功能语义理解源项目，并依据目标架构进行多项目融合与增量迁移"
+  default_prompt: "使用 $code-migration 先理解源项目功能、用户迁移意图与目标架构，再按结构切片和可验证功能切片逐步重建、融合并完成切流清理。"
