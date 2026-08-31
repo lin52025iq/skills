@@ -2,180 +2,19 @@
   "skill_name": "code-migration",
   "schema_version": 1,
   "evals": [
-    {
-      "id": 1,
-      "name": "multi-project-order-center-merge",
-      "prompt": "把 admin-a 和 admin-b 的订单中心迁入 target-console。A 有订单查询、退款和导出，B 有审批、风控和另一套订单状态；目标项目是 React + TypeScript，已有 Router、Query、权限和内部组件库。退款流程要采用新的产品规则，订单详情要融合两边信息。请实施迁移。",
-      "expected_output": "先恢复 A/B 的真实功能、业务规则与状态语义，形成 Canonical Model；再按用户意图确定 Desired Target Behavior，建立模块/Feature/Feature Item 台账，并使用目标项目已有架构逐个功能切片实施。",
-      "files": [],
-      "assertions": [
-        "不会把两个源项目分别整体搬入目标，而是先建立 Canonical Feature Model 和冲突清单。",
-        "明确区分 Source Evidence、Desired Target Behavior 与 Target Implementation。",
-        "识别订单状态、退款规则、权限和数据模型冲突，证据不足时记录 UNKNOWN 或 Decision。",
-        "优先复用目标 Router、Query、权限和组件库，源实现不一比一映射。",
-        "退款的新产品规则作为已批准变化验证，而不是被修回任一旧实现。"
-      ]
-    },
-    {
-      "id": 2,
-      "name": "layout-first-dashboard-migration",
-      "prompt": "把旧运营后台的 dashboard 迁到新后台。新后台的整体导航、内容宽度和 Design System 都不同。我希望先把新页面整体布局和样式骨架搭好，再按 Overview、Recent Orders、Alerts 这些区域逐块完成，别一上来所有功能一起写。",
-      "expected_output": "选择 Layout-first：先建立当前页面所需的最小 Structural Slice，再选一个区域完成可验收 Functional Slice；使用当前执行/待执行/已阻塞/已延后/已完成管理调度，避免多个区域同时半成品。",
-      "files": [],
-      "assertions": [
-        "把 Page Shell、Region、Responsive 和基础 Design System 作为 Structural Slice，而不是一次实现所有业务细节。",
-        "明确一次只有一个当前执行焦点，并优先把当前区域推进到完成条件后再开启同级区域。",
-        "不会把 Layout-first 解释为先给整个应用所有页面建立空壳。",
-        "每个区域内仍按可验证用户能力和 Feature Items 切片，而不是按组件文件批量开发。"
-      ]
-    },
-    {
-      "id": 3,
-      "name": "reuse-target-capability",
-      "prompt": "把旧 Vue 项目的用户编辑页迁到目标 React 项目。旧项目自己封装了 axios client、权限指令、Modal、日期工具和表单状态；目标项目已经有成熟的 API client、Permission、Dialog、date-fns 和 React Hook Form。",
-      "expected_output": "源项目用于恢复用户编辑的 Source Evidence 和必须保持的规则；Desired Target Behavior 确定后，目标实现优先 REUSE_TARGET，避免迁入旧 axios/权限/Modal/日期/表单 abstraction。",
-      "files": [],
-      "assertions": [
-        "明确 Source 是旧行为证据，不是目标实现规范。",
-        "将目标已有基础能力标为 REUSE_TARGET，而不是复制旧 abstraction。",
-        "区分业务规则与框架/基础设施机制，不把旧 Vue 技术形状映射到 React。",
-        "验证 Desired Target Behavior、权限、错误和数据契约，而不是只验证 build。"
-      ]
-    },
-    {
-      "id": 4,
-      "name": "representative-slice-before-scale",
-      "prompt": "一个很大的 AngularJS 客服系统要逐步迁到 Next.js，新旧系统至少共存半年。团队想先让 AI 批量生成 40 个页面，再集中修问题。系统有权限、SSR、表单和大量 API。",
-      "expected_output": "拒绝先铺开 40 个半成品；选择 Representative-slice-first 与渐进共存策略，先迁一个覆盖 Route、权限、SSR、数据和表单的代表性切片，验证规则后再扩大批次。",
-      "files": [],
-      "assertions": [
-        "不会同时铺开大量页面，强调一个主要当前执行焦点。",
-        "代表性切片用于验证目标架构、SSR、权限、数据、表单和测试方法。",
-        "设计新旧共存、切流、回滚和临时结构删除条件。",
-        "发现重复失败时先修迁移模型和台账规则，而不是继续批量生成。"
-      ]
-    },
-    {
-      "id": 5,
-      "name": "hidden-legacy-code-not-auto-migrated",
-      "prompt": "迁移设置模块时看到旧仓库还有一套没注册 Route 的数据导出页面、注释按钮和残留 API。顺便全部迁过去吧，可能以后会用。",
-      "expected_output": "不因代码存在自动恢复功能；检查 Route、权限、Flag、调用方、测试和历史，判断生命周期与置信度。缺少产品依据时保留 Unknown，并把不属于当前迁移的能力标记为延后或范围外，而非静默加入当前范围。",
-      "files": [],
-      "assertions": [
-        "代码存在不等于 Active。",
-        "REMOVE/不迁移决策需要证据，C0 不足以安全删除或恢复。",
-        "未来可能使用不等于当前范围内，可记录为延后。",
-        "不会为了迁移顺手扩大产品范围。"
-      ]
-    },
-    {
-      "id": 6,
-      "name": "codemod-boundary-semantic-change",
-      "prompt": "从旧框架迁到新框架时有 300 个组件需要改 import 和事件 API，其中 60 个组件还涉及权限、异步状态和新的产品交互。希望尽量自动化。",
-      "expected_output": "把稳定 import/API rename 作为 Mechanical 小批次 Codemod，在代表性样本验证后扩张；把权限、异步状态和产品交互归为 Semantic/Product，停止机械转换并按功能切片设计。",
-      "files": [],
-      "assertions": [
-        "明确 Mechanical、Semantic、Product 三类变化。",
-        "Codemod 先小批次验证并说明 What/Why/Scope/Validation/Rollback。",
-        "不会让批量脚本决定权限、状态所有权或产品交互。",
-        "自动化失败重复出现时修规则而不是继续扩大批次。"
-      ]
-    },
-    {
-      "id": 7,
-      "name": "resume-migration-from-workspace",
-      "prompt": "这是一个新的对话。目标仓库之前已经迁过一部分订单中心，根目录有 `.code-migration/`，我希望你继续上次的进度，不要从头重新分析和重复开发。",
-      "expected_output": "先读取状态总览和所有生效中用户规则，再读取模块/Feature/Feature Item 台账、当前执行计划并核对 Git/代码状态；状态冲突时先最小范围重新校准。",
-      "files": [],
-      "assertions": [
-        "把 `.code-migration/00-迁移状态总览.md` 作为新对话第一恢复入口。",
-        "恢复代码前会读取 `.code-migration/06-迁移约束与开发规则.md` 的生效规则。",
-        "读取模块功能点台账确认完整完成度，而不只看近期已完成 Slice。",
-        "核对目标仓库 Git/代码状态，状态总览不高于真实代码和测试。",
-        "不会重新实现已迁移/已清理 Feature，也不会重复询问已有答案。"
-      ]
-    },
-    {
-      "id": 8,
-      "name": "iterative-user-clarification",
-      "prompt": "迁移退款模块时，旧项目 A 允许审核后撤销退款，旧项目 B 不允许；目标项目没有同类实现，需求文档也没有说明。退款状态会影响真实资金操作。你先继续迁移，有不清楚的再处理。",
-      "expected_output": "把该冲突识别为必须询问，而不是任选 A/B；记录问题并向用户询问最关键的决策。用户回答后更新 Desired Target Behavior、Decision 和开始条件；若回答仍不足，可以继续下一轮澄清。",
-      "files": [],
-      "assertions": [
-        "将高风险业务语义冲突分类为必须询问，并把对应 Slice/Item 标为已阻塞。",
-        "一次聚焦少量最影响实现方向的问题，而不是一次性抛出所有未知。",
-        "支持多轮提问，直到开始条件满足或用户明确接受某种默认/风险。",
-        "用户回答会持久化到 `.code-migration/`，而不是只存在聊天上下文。",
-        "不会重复询问已有明确答案，也不会静默采用任一旧项目行为。"
-      ]
-    },
-    {
-      "id": 9,
-      "name": "session-handoff-and-reconcile",
-      "prompt": "这轮订单详情迁移做到一半我要先结束对话。当前有几个未提交文件，测试只跑了一部分。下次我会开一个新对话继续。另外上次的 `.code-migration/` 可能已经比代码落后了一点。",
-      "expected_output": "结束前把真实代码状态、Feature/Item 状态、已验证/未验证部分、未提交文件、当前 Slice、阻塞项和下一动作写入 Workspace；无法确认一致则标记需要重新校准。新对话先最小重新校准，再继续开发。",
-      "files": [],
-      "assertions": [
-        "不会把半完成代码记录成已迁移，而是使用实施中或验证中。",
-        "交接时记录 Git 分支、最近相关提交、工作区状态、当前代码状态、测试/验证和待完成工作。",
-        "状态无法确认一致时使用需要重新校准，而不是假设文档正确。",
-        "新对话先核对当前 Slice 的 Git/代码、Feature Items 与迁移文档。",
-        "重新校准只扩大到确认当前状态所需的最小范围。"
-      ]
-    },
-    {
-      "id": 10,
-      "name": "approved-product-change-is-not-regression",
-      "prompt": "旧项目的客户列表默认每页 100 条，而且有一个旧版批量删除入口。新后台产品要求每页 50 条，并明确取消批量删除。迁移后测试发现和旧页面不一样，请修复差异。",
-      "expected_output": "依据已确认产品要求建立 Desired Target Behavior：分页 50 条、没有批量删除；把这两项记录为已批准变化。只修复真正偏离目标行为的差异，不把目标实现改回旧系统。",
-      "files": [],
-      "assertions": [
-        "不会因为 Source 与 Target 不一致就自动恢复 100 条分页或批量删除。",
-        "区分 Source Evidence 与 Desired Target Behavior。",
-        "批准变化成为验证基准的一部分。",
-        "验证围绕目标产品行为，而不是默认要求源系统等价。"
-      ]
-    },
-    {
-      "id": 11,
-      "name": "do-not-over-question-target-conventions",
-      "prompt": "迁移一个旧表单到目标 React 项目。目标仓库十几个相似表单都使用 React Hook Form、Zod、同一个内部 FormField 组件和固定目录规范。我没有特别指定新表单要用哪套技术，你按项目方式做。",
-      "expected_output": "把目标仓库稳定惯例视为足够证据并直接采用 React Hook Form、Zod、内部 FormField 和现有目录模式；这些低风险工程选择属于可推断，不向用户反复确认。",
-      "files": [],
-      "assertions": [
-        "不会把已有稳定目标工程惯例分类为必须询问。",
-        "根据目标仓库相似实现做 Target-native 设计。",
-        "只有会实质改变产品行为或不可逆长期方向的问题才优先询问用户。",
-        "不会因为 Source 使用另一套表单方案而复制旧 abstraction。"
-      ]
-    },
-    {
-      "id": 12,
-      "name": "feature-item-ledger-prevents-false-completion",
-      "prompt": "订单详情这个 Slice 已经把基础信息和支付信息做完了，但 403 权限处理还在开发，移动端布局代码写完但验证失败。请更新迁移状态并继续。",
-      "expected_output": "更新功能台账中的 Feature Items：基础信息/支付信息已实施且验证通过，403 权限实施中，移动端布局已实施但验证失败；Slice 可以根据自身范围完成，但订单详情 Feature 不能标为已迁移。",
-      "files": [],
-      "assertions": [
-        "分别维护范围状态、是否必需、实施状态、验证状态和阻塞状态。",
-        "403 权限处理标为实施中，而不是已完成。",
-        "移动端布局标为已实施 + 验证失败。",
-        "不会因为部分 Slice 已完成就把整个 Feature 标为已迁移。",
-        "Feature 生命周期根据所有范围内必需 Items 的真实状态推导。"
-      ]
-    },
-    {
-      "id": 13,
-      "name": "required-user-tool-unavailable",
-      "prompt": "我规定所有页面 UI 回归必须使用 Playwright。现在环境里没有 Playwright，也没有可用的浏览器连接。你直接换别的方式验证并继续迁移吧。",
-      "expected_output": "识别到生效中的‘必须使用 Playwright’规则与当前请求存在冲突。除非用户明确修改/豁免规则，否则不静默换工具；把相关验证 Item/Slice 标为已阻塞，说明原因和解除条件，并请求用户选择启用工具、允许替代、修改规则或延后。",
-      "files": [],
-      "assertions": [
-        "读取并遵守生效中的用户规则。",
-        "必须工具不可用时不会静默替换。",
-        "相关 Feature Item / Slice 标记为已阻塞并记录解除条件。",
-        "用户当前最新明确指令如果要修改旧规则，需要同步规则状态或形成明确豁免。",
-        "规则检查发生在进入实施/验证前，而不是事后补记录。"
-      ]
-    }
+    {"id":1,"name":"multi-project-order-center-merge","prompt":"把 admin-a 和 admin-b 的订单中心迁入 target-console。A 有订单查询、退款和导出，B 有审批、风控和另一套订单状态；目标项目是 React + TypeScript，已有 Router、Query、权限和内部组件库。退款流程要采用新的产品规则，订单详情要融合两边信息。请实施迁移。","expected_output":"先恢复 A/B 的真实功能、业务规则与状态语义，形成 Canonical Model；再按用户意图确定 Desired Target Behavior，建立模块/Feature/Feature Item 台账，并使用目标项目已有架构逐个功能切片实施。","files":[],"assertions":["不会把两个源项目分别整体搬入目标，而是先建立 Canonical Feature Model 和冲突清单。","明确区分 Source Evidence、Desired Target Behavior 与 Target Implementation。"]},
+    {"id":2,"name":"layout-first-dashboard-migration","prompt":"把旧运营后台的 dashboard 迁到新后台。新后台的整体导航、内容宽度和 Design System 都不同。我希望先把新页面整体布局和样式骨架搭好，再按 Overview、Recent Orders、Alerts 这些区域逐块完成，别一上来所有功能一起写。","expected_output":"选择 Layout-first：先建立当前页面所需的最小 Structural Slice，再选一个区域完成可验收 Functional Slice；使用当前执行/待执行/已阻塞/已延后/已完成管理调度。","files":[],"assertions":["不会把 Layout-first 解释为先给整个应用所有页面建立空壳。","每个区域内仍按可验证用户能力和 Feature Items 切片。"]},
+    {"id":3,"name":"reuse-target-capability","prompt":"把旧 Vue 项目的用户编辑页迁到目标 React 项目。旧项目自己封装了 axios client、权限指令、Modal、日期工具和表单状态；目标项目已经有成熟的 API client、Permission、Dialog、date-fns 和 React Hook Form。","expected_output":"源项目用于恢复 Source Evidence；目标实现优先 REUSE_TARGET。","files":[],"assertions":["明确 Source 是旧行为证据，不是目标实现规范。","将目标已有基础能力标为 REUSE_TARGET。"]},
+    {"id":4,"name":"representative-slice-before-scale","prompt":"一个很大的 AngularJS 客服系统要逐步迁到 Next.js，新旧系统至少共存半年。团队想先让 AI 批量生成 40 个页面，再集中修问题。","expected_output":"拒绝先铺开 40 个半成品；先做代表性切片验证规则后再扩大。","files":[],"assertions":["不会同时铺开大量页面。","发现重复失败时先修迁移模型和台账规则。"]},
+    {"id":5,"name":"hidden-legacy-code-not-auto-migrated","prompt":"迁移设置模块时看到旧仓库还有一套没注册 Route 的数据导出页面、注释按钮和残留 API。顺便全部迁过去吧，可能以后会用。","expected_output":"不因代码存在自动恢复功能；缺少产品依据时标记延后或范围外。","files":[],"assertions":["代码存在不等于 Active。","不会为了迁移顺手扩大产品范围。"]},
+    {"id":6,"name":"codemod-boundary-semantic-change","prompt":"从旧框架迁到新框架时有 300 个组件需要改 import 和事件 API，其中 60 个组件还涉及权限、异步状态和新的产品交互。希望尽量自动化。","expected_output":"机械变化可 Codemod；权限、状态和产品交互进入语义/产品设计。","files":[],"assertions":["不会让批量脚本决定权限、状态所有权或产品交互。","自动化失败重复出现时修规则而不是继续扩大批次。"]},
+    {"id":7,"name":"resume-migration-from-workspace","prompt":"这是一个新的对话。目标仓库之前已经迁过一部分订单中心，根目录有 `.code-migration/`，我希望你继续上次的进度。","expected_output":"先读取状态总览、生效中用户规则、功能台账、执行计划并核对 Git/代码状态。","files":[],"assertions":["读取模块功能点台账确认完整完成度。","不会重新实现已迁移/已清理 Feature。"]},
+    {"id":8,"name":"iterative-user-clarification","prompt":"迁移退款模块时，旧项目 A 允许审核后撤销退款，旧项目 B 不允许；目标项目没有同类实现，需求文档也没有说明。","expected_output":"识别为必须询问并阻塞相关 Slice/Item。","files":[],"assertions":["支持多轮提问。","不会静默采用任一旧项目行为。"]},
+    {"id":9,"name":"session-handoff-and-reconcile","prompt":"这轮订单详情迁移做到一半我要先结束对话。当前有几个未提交文件，测试只跑了一部分。","expected_output":"记录真实代码、Feature/Item 状态和待完成工作；必要时标记需要重新校准。","files":[],"assertions":["不会把半完成代码记录成已迁移。","重新校准只扩大到当前必要范围。"]},
+    {"id":10,"name":"approved-product-change-is-not-regression","prompt":"旧项目客户列表每页 100 条且有批量删除；新产品要求每页 50 条并取消批量删除。","expected_output":"把目标差异作为已批准变化，不修回旧系统。","files":[],"assertions":["区分 Source Evidence 与 Desired Target Behavior。","验证围绕目标产品行为。"]},
+    {"id":11,"name":"do-not-over-question-target-conventions","prompt":"目标 React 项目十几个相似表单都使用 React Hook Form、Zod 和内部 FormField，我没特别指定新表单用什么。","expected_output":"直接采用目标仓库稳定惯例，不反复询问。","files":[],"assertions":["稳定工程惯例属于可推断。","根据目标仓库相似实现做 Target-native 设计。"]},
+    {"id":12,"name":"feature-item-ledger-prevents-false-completion","prompt":"订单详情 Slice 基础信息和支付信息做完，但 403 权限还在开发，移动端布局验证失败。","expected_output":"逐 Item 更新状态，Feature 不能标为已迁移。","files":[],"assertions":["移动端布局标为已实施 + 验证失败。","不会因为部分 Slice 已完成就把整个 Feature 标为已迁移。"]},
+    {"id":13,"name":"required-user-tool-unavailable","prompt":"我规定所有页面 UI 回归必须使用 Playwright。现在环境里没有 Playwright，也没有可用浏览器连接。","expected_output":"不静默换工具；相关验证 Item/Slice 标为已阻塞并询问用户。","files":[],"assertions":["必须工具不可用时不会静默替换。","规则检查发生在进入实施/验证前。"]},
+    {"id":14,"name":"parallel-independent-feature-workstreams","prompt":"Dashboard Alerts、User Settings 和 Order Export 三个 Feature 已完成分析，属于不同模块，不修改相同 Route、Store、API contract、公共组件或 Feature Flag，也没有先后依赖。希望用多个子 Agent 同时开发；另一个 Refund Drawer 会修改 Order Detail 共用状态和订单 API。","expected_output":"对三个独立 Feature 建立多个受控并行 Workstream；Refund Drawer 因共享状态/API 边界不直接并行。","files":[],"assertions":["独立 Feature 通过并行安全检查后允许多个 Implementer 同时开发。","每个并行 Workstream 有唯一生产代码 Owner、明确修改范围、验证负责人和合并条件。","Refund Drawer 因共享状态/API contract 风险不会直接并行。","Coordinator 负责全局状态汇总。","并行冲突出现时能够暂停受影响 Workstream 并降级回串行。"]}
   ]
 }
