@@ -1,0 +1,128 @@
+{
+  "skill_name": "project-migration",
+  "schema_version": 1,
+  "evals": [
+    {
+      "id": 1,
+      "name": "vue2-order-page-to-react",
+      "prompt": "把 legacy-admin 中 Vue 2 的订单列表和订单详情迁到 new-console 的 React + TypeScript 项目。目标项目已经有 Router、TanStack Query、React Hook Form 和内部组件库。请直接实施，但不要改变现有页面视觉和交互。",
+      "expected_output": "先确认订单入口、权限、Feature Flag、页面状态和视觉基线，再引用目标项目范例形成垂直切片；目标实现使用现有 Router、Query、Form 和组件库，并提供功能、视觉、响应式与回滚证据。",
+      "files": [],
+      "assertions": [
+        "枚举源 Route、导航、权限、Flag、数据流和关键 UI 状态，并对功能生命周期给出证据。",
+        "未经批准不 redesign，建立或明确页面视觉、交互和响应式基线。",
+        "不按 .vue 文件或 Vuex module 一对一生成 React 文件和 Store。",
+        "优先复用目标项目现有 Router、TanStack Query、React Hook Form 和内部组件库。",
+        "按可独立验证与回滚的垂直页面切片实施，并运行目标项目已有验证命令。"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "audit-only-no-product-writes",
+      "prompt": "先评估一下把 AngularJS 客户门户迁到 Vue 3 是否可行，只要审计和风险报告，这一轮不要改任何产品代码或依赖。",
+      "expected_output": "保持只读，盘点源与目标、基线、迁移边界、策略候选、Unknown 和阻断项；明确说明未修改产品代码。",
+      "files": [],
+      "assertions": [
+        "识别为评估模式，并尊重不修改产品代码、依赖和锁文件的边界。",
+        "执行或建议只读盘点、Git/工程基线和运行证据收集。",
+        "给出迁移单位、风险维度、策略候选、Unknown 和下一安全步骤。",
+        "不直接输出大批量代码或文件级翻译 TODO。"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "cra-webpack-to-vite",
+      "prompt": "把一个 6 年历史的 CRA 项目迁到 Vite。项目有自定义 Webpack override、SVG loader、环境变量、代理、Jest、Storybook、service worker 和按需加载。希望尽量小步提交。",
+      "expected_output": "先建立构建与运行基线，盘点每个 override 的真实能力，选择原地增量策略；逐项处理 env、HTML/public path、SVG、proxy、tests、Storybook、PWA 和 chunks，并保持每步可构建和回滚。",
+      "files": [],
+      "assertions": [
+        "不机械复制全部 Webpack plugin，而是确认每项配置解决的能力和 Vite 原生替代。",
+        "覆盖环境变量、HTML/public path、SVG/assets、proxy、Jest/Storybook、service worker 和 dynamic import。",
+        "优先原地增量升级，锁定 package manager 与运行时，并保持每步可发布或回退。",
+        "记录源基线失败，验证生产构建和代表性浏览器流程。",
+        "说明旧配置、兼容层和依赖的删除 Gate。"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "next-pages-to-app-router-ssr",
+      "prompt": "将 Next.js Pages Router 的账户中心迁到 App Router。页面依赖 cookie 会话、SSR 数据、动态 metadata、客户端表单和第三方图表，之前试迁时出现 hydration mismatch。",
+      "expected_output": "以 Route 和用户能力为边界，明确 server/client component、cookie/auth、cache、metadata、loading/error/not-found、图表隔离和 hydration 输入；先用代表性页面验证，再渐进切流。",
+      "files": [],
+      "assertions": [
+        "明确 server/client 边界、cookie/auth、数据 cache/revalidation 和 metadata 所有权。",
+        "主动检查时间、locale、storage、随机值、Flag 和第三方浏览器组件等 hydration 风险。",
+        "保留 direct URL、redirect、404/403、back/forward 和表单交互契约。",
+        "先做包含 SSR、表单和图表的代表性试迁移，而不是把全部页面包成 client-only。",
+        "验证 hydration warning、console/network、E2E 和适用视觉基线。"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "component-scope-stays-small",
+      "prompt": "把旧项目里的 DateRangePicker 单组件迁到目标项目，目标已有 Radix 和 date-fns。只迁这个组件，不需要整套项目迁移文档。",
+      "expected_output": "保持组件级范围，建立简要 props/event/keyboard/locale/disabled/error 契约，复用目标组件和日期库，做 component/visual/a11y 验证，不初始化 full 工作区。",
+      "files": [],
+      "assertions": [
+        "不把单组件请求扩张为整应用迁移或 full 工作区。",
+        "检查 props、事件值、受控模型、键盘、focus、locale、timezone、disabled 和 error 语义。",
+        "复用目标项目 Radix/date-fns 惯例，而非复制源组件内部结构。",
+        "使用 component、visual 和 Accessibility 级验证。"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "deprecated-hidden-feature-not-revived",
+      "prompt": "迁移设置页面时发现旧仓库里有一个被注释的“导出全部数据”按钮、未注册 Route 和一套残留 API 调用。请顺便迁过去，免得以后要用。",
+      "expected_output": "拒绝仅因代码存在而恢复功能；继续检查提交历史、Flag、权限、替代实现和调用方，将其分类为 Deprecated/Removed/Unknown，并在缺少明确产品依据时默认不迁移。",
+      "files": [],
+      "assertions": [
+        "明确代码存在不等于功能现役，注释代码默认不恢复。",
+        "检查 Route、导航、Flag、权限、调用方、替代实现和历史证据。",
+        "记录生命周期分类和不迁移依据；证据不足时标记 Unknown。",
+        "不会因为用户的‘以后可能用’而静默扩大产品范围。"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "visual-baseline-unavailable",
+      "prompt": "源前端目前跑不起来，只有代码、几张旧截图和部分 Storybook。仍然需要开始迁移营销后台的报表页面，并尽量保持原样。",
+      "expected_output": "记录运行失败和证据等级，用截图、Storybook、DOM/CSS 和测试建立降级基线；先迁可验证切片，明确无法证明像素等价的风险，不把未验证写成通过。",
+      "files": [],
+      "assertions": [
+        "记录源应用无法运行的基线失败和已尝试命令。",
+        "按截图、Storybook、代码和测试建立降级视觉/交互基线并标注证据等级。",
+        "选择可独立验证的试迁移，不声称已证明完整视觉等价。",
+        "视觉敏感发布保留人工确认或阻断项。"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "microfrontend-route-strangler",
+      "prompt": "把主站里的结算中心从 Angular 迁到 React，但旧主站半年内不能下线。两边需要共享登录、主题和埋点，并且要能按用户灰度和分钟级回滚。",
+      "expected_output": "选择 Route/Feature Strangler，定义单一 Shell owner、auth/theme/analytics/Router 边界、cohort flag、观测指标、回滚演练和临时桥接删除条件；高风险写操作避免无保护双写。",
+      "files": [],
+      "assertions": [
+        "选择渐进共存策略并说明为什么不适合一次性替换。",
+        "明确 Router、history、auth/session、theme、analytics、portal 和 scroll 的单一 owner。",
+        "定义按用户灰度、默认路径、监控、分钟级回滚动作和演练。",
+        "对结算写操作、幂等、数据/cache 一致性和双写风险给出护栏。",
+        "给出 Flag、bridge、旧 Route、CSS 和重复依赖的清理 Gate。"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "review-existing-migration-pr",
+      "prompt": "Review 这个 Vue 到 React 的迁移 PR。它已经能 build，但新增了第二套 API client 和 Redux store，删掉了几个隐藏菜单，截图测试阈值也从 0.1 提到 0.5。先只给审查结论。",
+      "expected_output": "按严重度优先报告生命周期证据不足、第二套架构、状态分类错误和视觉阈值掩盖回归等问题，引用具体路径或差异，不直接修改代码。",
+      "files": [],
+      "assertions": [
+        "识别为审查模式，先报告问题且不擅自修改代码。",
+        "把未验证删除隐藏菜单视为生命周期/可达性风险。",
+        "把第二套 API client 和 Redux store 视为目标项目惯例偏离或 Copy-Smell。",
+        "质疑扩大截图阈值，要求先稳定环境并分类真实差异。",
+        "问题按严重度排序，并要求文件、Route、测试或截图证据。"
+      ]
+    }
+  ]
+}

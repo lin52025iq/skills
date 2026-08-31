@@ -1,40 +1,109 @@
 # 前端项目迁移 Skill
 
-`project-migration` 是一个面向 AI 编程代理的**前端项目迁移与现代化 Skill**，用于把已有前端项目中的页面、功能模块和用户体验迁移到新的前端项目，并支持 React、Vue、Angular、Svelte、JavaScript / TypeScript、SPA / SSR、微前端、状态管理、组件库和样式体系之间的迁移。
+`project-migration` 是面向 AI 编程代理的前端迁移执行 Skill。它覆盖从只读审计、迁移规划、跨框架实施，到视觉回归、渐进切流、回滚和旧实现清理的完整闭环。
 
-它不把迁移理解成“把旧组件换一种语法复制过去”。默认工作方式是：
+它解决的不是“把 `.vue` 改写成 `.tsx`”，而是：
 
 ```text
-研究源前端真实入口
-→ 识别现役 / 隐藏 / 禁用 / 废弃功能
-→ 递归下钻生成功能文档
-→ 建立页面视觉、响应式和交互基线
-→ 蒸馏技术无关的迁移语义
-→ 研究目标前端项目架构与惯例
-→ 形成目标原生页面 / 模块蓝图
-→ Rebuild
-→ 功能 + 视觉 + 交互 + Accessibility 验收
+源前端真实功能与运行证据
+→ 生命周期与视觉交互契约
+→ 迁移策略和目标原生蓝图
+→ 代表性试迁移
+→ 垂直切片重建
+→ 功能、视觉、交互、Accessibility 与运行质量验收
+→ 切流、回滚和清理
 ```
 
-核心原则：
+## 适用场景
 
-- **代码存在不等于功能需要迁移**：必须检查被注释的 JSX / Template、未注册 Route、隐藏 Menu、Feature Flag、Permission、CSS hidden、替代实现和废弃证据。
-- **未经批准不做 redesign**：目标内部实现可以重建，但现役页面的布局、样式、响应式和交互默认跟随源项目对齐。
-- **先建立视觉基线再迁移页面**：关键页面要记录 viewport、Page Shell、Grid / Flex、spacing、字体、颜色、Icon、Loading / Empty / Error 等状态。
-- **目标前端项目决定代码形状**：优先复用目标项目已有 Router、State、API Client、组件库、Design System、Styling 和测试方式。
-- **禁止源结构一对一翻译**：不默认执行 `.vue → .tsx`、旧 Component → 新 Component、旧 Store → 新 Store、旧 CSS → 新 CSS 的机械映射。
-- **视觉和功能都是验收条件**：Build 成功、页面能打开、API 能调用，都不能单独代表迁移完成。
-- **大模块支持 Supervisor + Workstreams**：可以按页面能力、视觉基线、状态模型、数据层和独立验收拆给多个子 Agent / Agent Team / 独立对话。
-- Skill 工作语言始终为中文。
+- React、Vue、Angular、Svelte 等框架互迁或大版本升级；
+- CRA/Webpack 到 Vite，SPA 到 SSR/SSG，Pages Router 到新 Router 架构；
+- 页面、Route、状态管理、请求层、表单、组件库和样式体系迁移；
+- JavaScript 到 TypeScript；
+- 微前端拆分、合并、渐进替换或回收；
+- 旧页面迁入新仓库，并保持现役功能、视觉、响应式和交互；
+- 审查已有迁移是否遗漏功能、恢复废弃能力或复制了源框架结构；
+- 救援卡住、回归频发或缺少回滚路径的迁移。
 
-入口：[`project-migration/SKILL.md`](project-migration/SKILL.md)
+它不用于纯绿地 UI 设计；除非用户明确要求 redesign，迁移默认保持源项目现役体验。
 
-前端视觉与交互：[`project-migration/references/15-前端视觉与交互还原.md`](project-migration/references/15-前端视觉与交互还原.md)
+## 快速使用
 
-功能生命周期：[`project-migration/references/14-功能生命周期与废弃识别.md`](project-migration/references/14-功能生命周期与废弃识别.md)
+```text
+使用 $project-migration，把 source-app 的订单页面迁到 target-app。
+先只读审计两个项目，确认功能生命周期、视觉基线、目标项目惯例和回滚策略；
+再按垂直切片实施，并给出功能、截图、响应式、Accessibility 和构建测试证据。
+```
 
-功能递归理解：[`project-migration/references/13-功能文档与递归下钻.md`](project-migration/references/13-功能文档与递归下钻.md)
+主入口：[`project-migration/SKILL.md`](project-migration/SKILL.md)
 
-目标原生重建：[`project-migration/references/11-目标原生重建.md`](project-migration/references/11-目标原生重建.md)
+## 工作模式
 
-多 Agent / 多会话编排：[`project-migration/references/12-多Agent与多会话编排.md`](project-migration/references/12-多Agent与多会话编排.md)
+| 模式 | 结果 |
+|---|---|
+| 评估 | 可行性、范围、风险、未知项，不改产品代码 |
+| 规划 | 功能契约、视觉基线、策略、蓝图、切片和验证计划 |
+| 实施 | 目标原生代码、测试、差异记录、切流与清理 |
+| 审查 | 按严重度报告遗漏、回归、Copy-Smell 和发布风险 |
+| 救援 | 找到反复失败的上游原因并恢复迁移闭环 |
+
+## 工作区强度
+
+- `small`：单页面或边界清晰的小迁移；
+- `standard`：多页面或模块级迁移；
+- `full`：整应用、框架、构建、SSR 或微前端迁移。
+
+```bash
+python project-migration/scripts/init_migration_workspace.py <repo-root> --profile standard --dry-run
+python project-migration/scripts/init_migration_workspace.py <repo-root> --profile standard
+python project-migration/scripts/validate_migration_workspace.py <repo-root> --profile standard
+```
+
+## 静态盘点工具
+
+`frontend_inventory.py` 只读检查 package manager、workspace、框架、Router、状态、数据层、样式、测试、配置、入口候选和生命周期风险信号，不执行项目代码，也不读取 `.env` 值。
+
+```bash
+python project-migration/scripts/frontend_inventory.py <repo-root> --format markdown
+python project-migration/scripts/frontend_inventory.py <repo-root> --format json --output inventory.json
+```
+
+盘点结果是侦察线索，不是最终产品事实；关键页面仍应通过运行、测试和浏览器证据确认。
+
+## 核心原则
+
+- **代码存在不等于功能现役**：检查 Route、导航、Flag、权限、隐藏样式、注释与替代实现。
+- **未经批准不 redesign**：内部架构可以重建，用户可观察体验默认保持。
+- **目标项目决定代码形状**：复用目标 Router、状态、数据、组件、Token 和测试惯例。
+- **按垂直能力切片**：不按源文件树机械翻译。
+- **先有裁判再批量实施**：功能和视觉都要能比较，Unknown 不能伪装成完成。
+- **迁移必须可退出**：共存、切流、回滚和兼容层删除条件属于设计的一部分。
+
+## 目录
+
+```text
+project-migration/
+├── SKILL.md
+├── agents/openai.yaml
+├── scripts/
+│   ├── frontend_inventory.py
+│   ├── init_migration_workspace.py
+│   └── validate_migration_workspace.py
+├── references/
+│   ├── 16-前端迁移执行协议.md
+│   ├── 17-迁移策略与共存回滚.md
+│   ├── 18-框架与工程迁移策略.md
+│   └── 19-验证与视觉回归执行.md
+├── templates/
+└── evals/evals.json
+```
+
+已有 `references/00-15` 和 `templates/` 继续提供详细方法和迁移证据模板；主 `SKILL.md` 只保留决策、Gate 和按需路由，避免一次加载全部材料。
+
+## 验证 Skill 本身
+
+```bash
+python tools/validate_skill.py project-migration
+```
+
+仓库 CI 会检查 frontmatter、主文件长度、内部链接、`agents/openai.yaml`、Python 脚本和评测集结构。

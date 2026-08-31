@@ -1,4 +1,4 @@
 interface:
   display_name: "前端项目迁移"
-  short_description: "迁移前端功能，并还原页面视觉与交互体验"
-  default_prompt: "使用 $project-migration 完成这个前端迁移任务：先枚举源项目 Route、导航、页面和交互入口，递归下钻生成功能文档，并检查被注释、隐藏、禁用、Feature Flag、权限和已替代功能的生命周期；只迁移确认需要的现役或条件现役能力。对关键页面建立布局、样式、响应式和 Loading/Empty/Error 等 UI 状态的视觉基线。随后研究目标前端项目的框架、Router、State、组件库、Design System、Styling 和测试惯例，以目标原生方式 Rebuild；未经明确批准不要 redesign，目标页面应跟随源项目现役视觉和交互进行对齐。范围较大时主动采用 Supervisor + Workstreams，把功能研究、视觉基线、页面实现和独立验收拆给多个子 Agent 或独立对话。"
+  short_description: "审计源前端、规划目标原生重建，并验证功能、视觉与交互等价性"
+  default_prompt: "使用 $project-migration 审计源与目标前端项目，选择安全的迁移策略，按目标项目惯例增量重建，并提供功能、视觉、交互、切流与回滚验证证据。"
