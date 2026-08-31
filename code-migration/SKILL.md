@@ -1,54 +1,56 @@
 ---
 name: code-migration
-description: 用于将一个或多个现有项目中的功能、业务规则和用户能力迁移、融合或重构到目标项目。适用于前端项目迁入新仓库、跨框架或技术栈重实现、多个旧项目能力合并、模块整合、功能删改融合、目标架构适配与渐进切流。迁移以功能语义和用户意图为中心：先用源项目恢复真实行为与约束，再确定目标系统期望能力，最后按目标仓库已有架构和技术栈重新实现；默认不按源文件、目录、组件或状态结构一比一翻译，并以模块、功能、功能项和可验证切片逐步推进。
+description: 用于将一个或多个现有项目中的功能、业务规则和用户能力迁移、融合或重构到目标项目。适用于前端项目迁入新仓库、跨框架或技术栈重实现、多个旧项目能力合并、模块整合、功能删改融合、目标架构适配与渐进切流。迁移以源行为证据、目标期望行为和目标项目原生架构为中心，先建立可追踪的源行为契约和功能台账，再按 Slice / Workstream 实施、验证与清理；默认不按源文件、目录、组件或状态结构一比一翻译，并支持通过安全检查后的多 Agent 受控并行迁移。
 ---
 
 # Code Migration
 
 把代码迁移视为“业务能力在新上下文中的受控重建”，不是文件搬运、语法翻译，也不是旧架构复制。
 
-核心模型：
+核心链路：
 
 ```text
 Source Evidence
-  源项目真实行为、业务规则、数据契约、历史约束
-                     ↓
+    ↓
+Source Behavior Contract
+    ↓
 Desired Target Behavior
-  用户迁移意图 + 目标产品要求 + 必须保留的 Invariant
-                     ↓
+    ↓
 Target-native Design
-  目标仓库架构 + 技术栈 + 已有公共能力
-                     ↓
-Feature Ledger + Slice Queue
-  明确完整范围与当前执行焦点
-                     ↓
-Incremental Implementation & Verification
+    ↓
+Module → Feature → Feature Item Ledger
+    ↓
+Slice / Controlled Workstream
+    ↓
+Implementation → Verification → Integration
+    ↓
+Cutover → Cleanup
 ```
 
 ## 1. 核心原则
 
-1. **迁移的是能力，不是文件。** 文件、组件、Store、Hook、Service 只是理解源能力的证据，不是迁移边界。
-2. **Source 是事实证据，不是目标规范。** 源项目回答“旧系统实际做了什么”，不能自动决定新系统必须继续怎样做。
-3. **先确定目标期望行为，再设计代码。** 用户意图和目标产品要求决定保留、调整、融合、拆分、删除或新增什么；必须保留的 Invariant 不能因技术迁移丢失。
-4. **Target 决定实现形状。** Router、状态、数据层、组件、目录、错误处理、测试和工程模式优先遵循目标项目已有惯例。
-5. **默认禁止一比一结构翻译。** 不把旧文件树、Store、API abstraction 或组件层机械映射到目标项目。
-6. **完整范围由功能台账维护。** Module → Feature → Feature Item 是迁移范围和完成度的事实记录；Slice Queue 只负责调度，不能替代功能清单。
-7. **一次只保持一个主要执行焦点。** 默认单 Agent 优先完成一个可验收 Slice，不同时铺开大量半成品。
-8. **开发过程中实时更新状态。** 不能先写完一批代码再补清单；实施、验证、阻塞变化要同步到 Feature Item。
-9. **用户规则是执行约束。** 用户可以指定必须/禁止使用的工具、技术、测试方式或确认点；每个 Slice 开始前必须检查生效规则。
-10. **迁移验证面向目标行为。** `KEEP` 要证明关键旧能力没有回归；`ADAPT/MERGE/REPLACE/NEW` 要证明批准后的目标行为正确。
-11. **机械变化自动化，语义变化分析，产品变化显式决策。** Codemod 只负责可证明安全的 Mechanical 变化。
-12. **迁移完成不等于新代码能跑。** 还要处理切流、临时结构、旧入口、旧依赖和遗留清理。
+1. **迁移的是能力，不是文件。** 文件、组件、Store、Hook、Service 只是理解源能力的证据。
+2. **Source 是事实证据，不是目标规范。** 源项目说明旧系统实际做了什么，不能自动决定新系统必须继续怎样做。
+3. **源行为必须可追踪。** 关键可观察行为要形成 Source Behavior，并映射到“保持 / 目标修改 / 不迁移 / 未知”。
+4. **先确定目标期望行为，再设计代码。** 用户意图、目标产品要求和必须保留的 Invariant 决定目标行为。
+5. **Target 决定实现形状。** Router、状态、数据层、组件、目录、错误处理、测试和工程模式遵循目标仓库稳定惯例。
+6. **完整范围由功能台账维护。** Module → Feature → Feature Item 是范围和完成度的事实记录；Slice Queue 只负责调度。
+7. **每个 Workstream 单焦点，全局可安全并行。** 一个 Workstream 内只推进一个主要实施焦点；多个独立 Feature 通过并行安全 Gate 后可以由不同 Implementer 同时开发。
+8. **开发过程中实时更新状态。** 不允许先写完一批代码再补台账。
+9. **用户规则是执行约束。** 用户可规定必须/禁止的工具、技术、测试方式和确认点。
+10. **验证面向目标行为。** 保持项验证源行为没有丢失；批准变化验证新行为正确。
+11. **机械变化自动化，语义变化分析，产品变化显式决策。** Codemod 只用于可证明安全的 Mechanical 变化。
+12. **迁移完成不等于新代码能跑。** 还要完成集成验证、切流和遗留清理。
 
 ## 2. 启动方式
 
 收到迁移请求后，先根据用户上下文识别：
 
-- 源项目；
-- 目标仓库；
+- Source 项目；
+- Target 仓库；
 - 迁移目标；
 - 用户明确约束；
-- 已知目标架构与技术栈。
+- 已知目标架构和技术栈。
 
 然后检查目标仓库根目录：
 
@@ -61,75 +63,69 @@ Incremental Implementation & Verification
 优先恢复，不重新初始化：
 
 1. 读取 `00-迁移状态总览.md`；
-2. 读取 `06-迁移约束与开发规则.md` 中所有“生效中”规则；
-3. 读取 `02-迁移模块功能点清单.md`；
-4. 根据当前焦点读取详细功能文档、Decision 和执行计划；
-5. 核对当前 Git、代码和测试状态；
-6. 如文档与代码不一致，先做最小范围重新校准，再继续开发。
+2. 恢复 Active Workstreams、Owner、输入基线和当前状态；
+3. 读取 `06-迁移约束与开发规则.md` 中所有“生效中”规则；
+4. 读取 `02-迁移模块功能点清单.md`；
+5. 根据当前 Feature 读取 Source Behavior / 详细语义 / Decision / 执行计划；
+6. 核对 Git、实际代码和测试状态；
+7. 如有冲突，先做最小范围重新校准。
 
 ### 不存在工作区
 
-对长周期页面、业务模块、多项目融合或整应用迁移，在目标仓库创建必要文档：
+对长周期页面、业务模块、多项目融合或整应用迁移，按需创建：
 
 ```text
 .code-migration/
 ├── 00-迁移状态总览.md
 ├── 01-迁移任务上下文.md
 ├── 02-迁移模块功能点清单.md
-├── 02-功能清单.md                 # 需要详细语义时
 ├── 03-功能融合映射.md             # 多源时按需
-├── 04-迁移决策记录.md             # 有重大决策时按需
+├── 04-迁移决策记录.md             # 重大决策时按需
 ├── 05-迁移执行计划.md
-└── 06-迁移约束与开发规则.md
+├── 06-迁移约束与开发规则.md
+├── 07-源行为与目标对齐清单.md     # 复杂 Feature/模块按需
+└── modules/<module>/              # 独立规划/验证有价值时
 ```
 
-单组件或很小的一次性任务可降低文档强度，不为形式机械生成所有文件。
+单组件或很小的一次性任务可降低文档强度，不机械创建全部文件。
 
-## 3. 适用场景
-
-使用本 Skill 处理：
-
-- 一个前端项目迁入另一个已有架构的项目；
-- Vue / React / Angular / Svelte 等跨框架或大版本迁移；
-- JavaScript 到 TypeScript、旧状态方案迁入目标项目既有方案；
-- 多个后台、门户或业务项目融合为一个目标应用；
-- 旧项目中的部分模块、页面或功能迁入新仓库；
-- 迁移过程中同时修改、融合、替换或淘汰部分旧功能；
-- 新旧系统需要渐进共存、灰度、回滚或临时 Adapter；
-- 审查已有迁移是否复制旧架构、遗漏业务规则或失去迁移焦点。
-
-如果没有需要理解、迁移或融合的源能力，应使用普通开发/架构流程。
-
-## 4. 三类变化
+## 3. 三类变化
 
 | 类型 | 含义 | 默认处理 |
 |---|---|---|
-| Mechanical | import、API rename、确定性的语法/结构变化 | Codemod 或小批量自动化 |
+| Mechanical | import、API rename、确定性的语法/结构变化 | Codemod / 小批量自动化 |
 | Semantic | 业务行为、状态语义、生命周期、数据、副作用 | 理解语义后按目标架构重实现 |
-| Product | 功能增加、删除、融合、规则或 UX 改变 | 依据用户意图和目标产品要求决策 |
+| Product | 功能增加、删除、融合、规则或 UX 改变 | 按用户意图和目标产品要求决策 |
 
 不得用 Mechanical 工具替代 Semantic / Product 判断。
 
-## 5. 迁移决策
+## 4. 迁移决策
 
-每个能力使用明确决策：
+Feature 级迁移决策使用：
 
-- `KEEP`：目标仍需保持该能力和关键行为，实现方式可以变化；
-- `ADAPT`：能力保留，但目标行为或实现需按新要求调整；
-- `MERGE`：多个来源融合成一个目标能力；
-- `SPLIT`：一个源能力拆成多个目标能力；
-- `REMOVE`：目标系统明确不需要；
-- `REPLACE`：由新的产品能力或实现替代；
-- `REUSE_TARGET`：目标项目已有能力可直接复用；
-- `NEW`：迁移范围内明确新增；
-- `DEFER`：相关但不属于当前迁移范围；
-- `UNKNOWN`：当前证据不足，尚未做出安全决策。
+```text
+KEEP / ADAPT / MERGE / SPLIT / REMOVE
+REPLACE / REUSE_TARGET / NEW / DEFER / UNKNOWN
+```
 
 重大 `REMOVE / MERGE / REPLACE`、Invariant 变化或高风险产品行为变化应记录 Decision。
 
-## 6. 证据、Invariant 与范围
+Source Behavior 级目标决策使用：
 
-关键判断使用轻量证据等级：
+```text
+保持 / 目标修改 / 不迁移 / 未知
+```
+
+其中：
+
+- `保持`：目标必须覆盖对应可观察行为；
+- `目标修改`：必须写明批准后的 Target Behavior；
+- `不迁移`：必须有范围或产品依据；
+- `未知`：关键行为未决时不得假装已设计完成。
+
+## 5. 证据、Invariant 与 Source Behavior
+
+证据等级：
 
 ```text
 C3 Runtime  ：真实运行、用户路径、E2E、生产/预发布证据
@@ -138,60 +134,70 @@ C1 Static   ：静态代码、调用关系、样式、提交历史
 C0 Unknown  ：推断或缺少可靠证据
 ```
 
-重点用于确认：功能是否现役、Business Rule、Invariant、删除/融合判断、多源冲突和兼容行为。
+优先用于确认：功能是否现役、Business Rule、Invariant、权限、金额/状态、删除/融合判断、兼容行为。
 
-Invariant 是迁移中必须显式保护的约束，例如权限边界、金额规则、状态流转、幂等性和数据一致性。只有用户或目标产品明确修改时才能改变，并应记录 Decision。
-
-运行时范围状态统一使用中文：
+对关键 Feature 提取可观察 Source Behavior，例如：
 
 ```text
-范围内 / 延后 / 范围外
+入口 / 前置条件
+加载 / 空状态 / 错误状态
+核心操作
+权限 / Disabled / Hidden
+数据格式和字段显隐
+导航 / Deep Link / Back-forward
+状态流转 / 表单校验
+副作用 / Analytics / Integration
+响应式 / Accessibility
 ```
 
-不复制无必要技术债，也不借迁移之名清理所有技术债。
+不要只记录“有订单详情”这种粗粒度描述。
 
-## 7. 八阶段迁移流程
+详见 `references/11-源行为契约与开发对齐.md`。
 
-### Phase 1 — 确定迁移意图、范围与长期规则
+## 6. 八阶段迁移流程
 
-明确：
+### Phase 1 — 确定意图、范围和长期规则
 
-- 为什么迁、迁到哪里；
-- 一个还是多个源项目；
-- 用户希望保留、修改、融合、删除、新增什么；
-- 目标项目和技术栈；
-- 性能、Accessibility、SEO、SSR、浏览器、i18n、安全等非功能要求；
-- 发布、共存、灰度和回滚要求；
-- 用户对工具、技术、测试、操作方式和确认点的长期规则。
+明确迁移目标、保留/修改/删除/新增能力、非功能要求、发布/回滚要求和用户开发约束。
 
 长期规则写入 `.code-migration/06-迁移约束与开发规则.md`。详见 `references/10-用户约束与开发规则.md`。
 
-### Phase 2 — 恢复源项目真实能力
+### Phase 2 — 恢复 Source 真实能力
 
-先读仓库指令、README、依赖、Route、入口、状态、请求层、权限、测试和部署配置，再从真实入口递归跟踪用户行为。
+从真实 Route/入口出发，结合调用链、权限、Flag、测试、配置和运行证据恢复真实功能。
 
-代码存在不等于功能现役。检查 Route、导航、权限、Feature Flag、调用方、注释、隐藏入口、替代实现和测试。
+代码存在不等于功能现役。
 
 详见 `references/01-迁移上下文与源项目理解.md`。
 
-### Phase 3 — 建立功能语义、业务规则与 Invariant
+### Phase 3 — 建立 Source Behavior Contract
 
-把代码语言转成产品/领域语言：
+把 Source 功能拆成可验证行为，并为重要行为分配稳定 ID：
 
 ```text
-Actor → Entry → Precondition → Action → Business Rule
-→ Data → Side Effect → Result → Failure → Lifecycle
+SB-<FEATURE>-001
 ```
 
-把旧代码区分为业务规则、用户可观察行为、集成契约、框架机制、基础设施机制、Workaround、Bug Compatibility、技术债、Dead Code 或 Unknown。
+每条行为至少记录：
 
-这一步回答“旧能力是什么”，不自动等同于“目标必须原样保留什么”。
+```text
+Source Behavior
+Evidence
+Target Decision
+Desired Target Behavior
+关联 Feature Item
+Validation Method
+```
 
-详见 `references/02-功能语义与业务规则.md`。
+所有“保持”的关键 Source Behavior 必须映射到至少一个范围内 Feature Item；否则视为迁移遗漏。
 
-### Phase 4 — 形成目标能力模型并解决多源冲突
+所有“目标修改”必须有明确批准后的 Target Behavior。
 
-单源也要从 Source Feature 推导目标期望行为；多源先做语义归一化：
+详见 `references/02-功能语义与业务规则.md` 与 `references/11-源行为契约与开发对齐.md`。
+
+### Phase 4 — 形成 Desired Target Behavior 并解决多源冲突
+
+多源先归一化：
 
 ```text
 Source A ─┐
@@ -201,35 +207,29 @@ Source C ─┘
          Desired Target Behavior
 ```
 
-决策顺序：用户明确意图 → 目标产品要求 → 必须保留的 Invariant → 目标系统稳定约束 → C3/C2 源证据 → C1 → 推断。
+决策顺序：用户明确意图 → 目标产品要求 → 必须保留的 Invariant → 目标系统稳定约束 → C3/C2 → C1 → 推断。
 
-无法安全决定时保持 `UNKNOWN`；真正影响当前目标行为的关键问题进入澄清循环。
+关键冲突无法安全决定时进入澄清循环。
 
 详见 `references/03-多项目融合与冲突决策.md`。
 
-### Phase 5 — 理解目标项目并设计 Target-native 方案
+### Phase 5 — Target-native 设计
 
-先研究目标项目已有相似实现和公共能力，再决定目标模块、Route、Data、State、UI、Permission 和 Testing。
+研究目标项目稳定相似实现和公共能力，再决定目标 Module、Route、Data、State、UI、Permission 和 Testing。
 
-核心问题：
-
-> 如果按照已经确定的目标行为，今天在这个仓库里原生开发，该怎样实现？
-
-已有能力优先 `REUSE_TARGET`；目标确实缺失时只补最小必要 Foundation。
+已有能力优先 `REUSE_TARGET`；缺失时只补最小必要 Foundation。
 
 详见 `references/04-目标项目架构理解.md`。
 
-### Phase 6 — 建立完整功能台账并选择迁移策略
+### Phase 6 — 建立功能台账、依赖和 Workstream 候选
 
-在大规模开发前，把本次迁移涉及的范围整理成：
+迁移范围整理成：
 
 ```text
 Module
   └─ Feature
        └─ Feature Item
 ```
-
-`02-迁移模块功能点清单.md` 负责完整范围和真实完成度；`02-功能清单.md` 只在需要时保存详细业务语义、Invariant 和数据契约。
 
 每个 Feature Item 至少维护：
 
@@ -239,146 +239,186 @@ Module
 实施状态：未开始 / 实施中 / 已实施
 验证状态：未验证 / 验证中 / 通过 / 失败 / 不适用
 阻塞状态：未阻塞 / 已阻塞
+Source Behavior IDs
+Workstream ID / Owner / Verifier
 ```
 
-同时根据风险选择最小足够迁移策略：Direct Rewrite、Strangler、Branch by Abstraction、Adapter、Parallel/Shadow、Incremental Upgrade、Codemod-assisted 等。
+同时分析 Feature 间的代码、数据、语义和发布依赖，决定串行或并行候选。
 
 详见 `references/05-迁移设计与策略选择.md` 与 `references/06-分阶段迁移与功能切片.md`。
 
-### Phase 7 — 按 Slice 实施并实时更新 Feature Item
+### Phase 7 — Slice / Workstream 实施
 
-Slice Queue 只负责调度：
+每个 Slice 开始前先通过 Source Coverage Gate：
+
+- 关键 Source Behavior 已盘点；
+- 每条关键行为已决定“保持 / 目标修改 / 不迁移 / 未知”；
+- 所有“保持”行为都有 Feature Item；
+- “目标修改”有明确 Target Behavior；
+- 权限、状态、错误、Loading/Empty、Navigation 等关键维度已覆盖；
+- 不存在会改变方向的关键 Unknown。
+
+再检查用户规则和目标实现准备度。
+
+单 Workstream 内只保持一个主要实施焦点。
+
+多个独立 Feature 若通过 Parallel Safety Gate，可以建立多个 Active Workstreams 并由不同 Implementer 同时开发。
+
+详见 `references/09-迁移状态与跨会话协作.md`。
+
+### Phase 8 — 验证、集成、切流与清理
+
+验证分两层：
 
 ```text
-当前执行 / 待执行 / 已阻塞 / 已延后 / 已完成
+Workstream Validation
+→ Integration Gate
 ```
 
-Slice 可以覆盖一个完整 Feature，也可以只覆盖一组强关联 Feature Items。
+Workstream Validation 验证当前 Feature Items 和 Source/Target Behavior。
 
-默认开发循环：
+多个并行 Workstream 合并后必须做 Integration Gate，按风险检查 build/typecheck、共享测试、Route/Permission、shared state/query/API、E2E、CSS/bundle、用户规则等。
 
-```text
-从功能台账选择 Feature Items
-→ 检查当前 Slice 生效规则
-→ 实施状态 = 实施中
-→ 开发
-→ 实施状态 = 已实施
-→ 验证状态 = 验证中
-→ 验证
-→ 验证状态 = 通过 / 失败 / 不适用
-→ 更新阻塞状态
-→ 重新计算 Feature 生命周期
-→ 更新 Module 汇总
-→ 更新 Slice Queue
-→ 长周期任务同步状态总览
-```
-
-**Slice“已完成”不等于 Feature“已迁移”。** 只有所有“范围内 + 必需=是”的 Feature Items 已实施，并且要求的验证均通过/不适用，Feature 才能进入“已迁移”。
-
-前端允许：
-
-- Layout-first；
-- Feature-first；
-- Representative-slice-first。
-
-不要把 Layout-first 变成“先搭全应用所有空页面”。
-
-详见 `references/06-分阶段迁移与功能切片.md`。
-
-### Phase 8 — 验证目标行为、切流与清理
-
-验证不只看 build，而要证明目标期望行为：
-
-- `KEEP`：关键行为和 Invariant 未丢失；
-- `ADAPT/MERGE/REPLACE/NEW`：批准后的目标行为正确；
-- 权限、API/数据、关键 UI 状态和错误路径正确；
-- 适用的 unit/component/integration/E2E、视觉、响应式、Accessibility、SSR、性能、安全与可观测性通过。
-
-差异分类可使用：`MUST_FIX / APPROVED_CHANGE / ENVIRONMENT_NOISE / UNKNOWN`，它们是差异类型而不是迁移进度状态。
+只有独立验证和必要的 Integration Gate 都通过，才能把相关 Feature 视为最终完成并进入后续切流/清理。
 
 详见 `references/08-验证切流与遗留清理.md`。
 
-## 8. 功能生命周期与执行状态
+## 7. 运行时状态
 
-运行时功能生命周期统一使用中文：
+Feature 生命周期：
 
 ```text
 已发现 → 已设计 → 实施中 → 验证中 → 已迁移 → 已清理
 ```
 
-- `已发现`：功能已识别，但目标行为或必要 Items 尚不完整；
-- `已设计`：目标行为、Target Mapping、Required Items 和验证方式已明确；
-- `实施中`：仍有必需 Item 未实施完成；
-- `验证中`：必需开发项已实施，但验证 Gate 尚未全部通过；
-- `已迁移`：所有范围内必需 Items 已实施，要求验证均通过/不适用，并满足 Feature Done Gate；
-- `已清理`：目标能力完成，旧入口、旧实现和临时迁移结构已安全退出。
+Feature Item：
+
+```text
+范围状态：范围内 / 延后 / 范围外
+实施状态：未开始 / 实施中 / 已实施
+验证状态：未验证 / 验证中 / 通过 / 失败 / 不适用
+阻塞状态：未阻塞 / 已阻塞
+```
+
+执行队列：
+
+```text
+待执行 / 当前执行 / 已阻塞 / 验证中 / 已完成
+```
 
 `已阻塞` 是附加状态，不替代生命周期。
 
-执行队列状态统一使用：
+## 8. Workstream Input Baseline
+
+每个实施 Workstream 开始前冻结：
 
 ```text
-当前执行 / 待执行 / 已阻塞 / 已延后 / 已完成
+Source Behavior / Evidence Revision
+Desired Target Behavior Revision
+Decision / Rule 版本
+Target Mapping 基线
+Started At Commit
 ```
 
-## 9. Slice 开始条件与完成条件
+若实施过程中 Source Behavior、Decision、规则或 Target Behavior 发生影响当前实现的变化：
 
-### 开始条件
+```text
+暂停相关 Items
+→ 标记已阻塞
+→ 更新输入基线
+→ 重新检查开始条件
+→ 再继续
+```
 
-开始一个 Slice 前确认：
+不得让 Implementer 按已过期的行为模型继续开发。
 
-- 已理解相关 Source Evidence；
+## 9. Parallel Safety Gate
+
+并行实施前检查：
+
+- 相同生产文件/组件；
+- Route / Layout / Store / Query ownership；
+- API / Data Contract / shared types；
+- 权限模型、状态机、Invariant；
+- 未完成 Foundation；
+- 公共组件 / abstraction；
+- Adapter / Feature Flag / 切流路径；
+- package manifest / lockfile；
+- barrel/index、Route/Navigation/Permission registry；
+- codegen/schema/generated/i18n aggregate 输出；
+- 共享生成器或脚本；
+- 明确先后依赖。
+
+判断独立性必须同时覆盖：
+
+```text
+代码边界 + 数据/契约 + 业务语义 + 发布/合并路径
+```
+
+有高风险重叠时，拆 Foundation、指定唯一 Owner 或退回串行。
+
+真正并行写代码时优先使用独立 branch / worktree / isolated workspace；共享 working tree 无法可靠隔离写入时退回串行。
+
+## 10. Ownership 与状态写入
+
+同一个 Feature Item 同一时刻只能有一个生产代码 Owner；共享 Contract / Foundation 也必须有唯一 Owner。
+
+默认写入边界：
+
+- Implementer：更新自己拥有的 Feature Item 实施状态；
+- Verifier：更新自己负责的验证结果；
+- Source/Target Analyst：更新其分析输出，不写生产代码；
+- Coordinator：汇总 Active Workstreams、跨 Workstream 依赖、冲突和 `00-迁移状态总览.md`。
+
+Coordinator 不是所有细粒度状态的唯一写入者；但同一状态块同一时刻只能有一个 Owner。
+
+## 11. Slice / Workstream 开始条件
+
+开始实施前确认：
+
+- Source Coverage Gate 已通过；
 - 目标期望行为足够明确；
-- 当前 Feature / Feature Items 已进入功能台账；
-- 范围状态、是否必需和初始状态已记录；
-- Target 落点与项目惯例明确；
-- 必要依赖和验证方法存在；
-- 已加载并检查当前 Slice 的所有“生效中”用户规则；
-- 不存在会导致当前实现方向失真的关键 Unknown。
+- Feature / Items 已进入功能台账；
+- Workstream Input Baseline 已记录；
+- Target 落点和项目惯例明确；
+- 依赖和验证方法存在；
+- 已检查所有“生效中”用户规则；
+- 并行时已通过 Parallel Safety Gate 并明确 Workspace Isolation / Ownership。
 
-对规则：
+规则处理：
 
 - `必须` 未满足 → 不得开始；
-- 会违反 `禁止` → 必须改方案；
-- `必须询问` 尚未确认 → 相关 Slice / Item 标记“已阻塞”；
-- 偏离 `建议` → 记录理由。
+- 会违反 `禁止` → 改方案；
+- `必须询问` 未确认 → 标记“已阻塞”；
+- 偏离 `建议` → 记录原因。
 
-### 完成条件
+## 12. 完成条件与 Integration Gate
 
-一个 Slice 至少满足：
+Slice / Workstream 完成至少满足：
 
-- 覆盖的 Feature Items 已同步真实实施/验证/阻塞状态；
-- Slice 计划内开发和验证目标已完成或有明确 Decision；
-- 新发现必要 Item 已补入功能台账；
-- Business Rule / Invariant 或批准变化已验证；
-- Permission / Data Contract / Error Path 符合目标；
-- 使用 Target-native 架构；
-- 当前 Feature 生命周期已根据所有必需 Items 重新计算；
-- 没有静默扩大 Scope；
-- 长周期任务已同步状态总览和下一步。
+- 覆盖 Feature Items 状态真实；
+- Source Behavior 映射无遗漏；
+- Workstream Validation 通过；
+- 新发现必要 Item 已补入台账；
+- Business Rule / Invariant / Permission / Data Contract / Error Path 已覆盖；
+- 当前 Feature 生命周期已重新计算；
+- 未静默扩大 Scope 或违反用户规则。
 
-## 10. 澄清循环
+多个 Workstream 合并后，如果存在共享运行边界，必须再通过 Integration Gate。
 
-只有当 Unknown 同时满足“证据不足”且“会实质改变当前目标行为或不可逆方向”时才阻塞当前功能。
+Integration Gate 失败时，相关 Workstream 不得进入最终完成状态，由 Coordinator 指定修复 Owner。
 
-运行时类型统一使用中文：
+## 13. 澄清循环
+
+运行时类型：
 
 ```text
 必须询问 / 可推断 / 可延后
 ```
 
-不要把普通代码组织、命名、组件选择、目标仓库已有明确范例的问题都抛给用户。每轮只问最影响当前 Slice 的少量问题，回答后更新 Decision、规则或开始条件；必要时可以继续下一轮。
+只有证据不足且答案会实质改变目标行为或不可逆方向时才“必须询问”。普通目标工程惯例优先“可推断”。
 
-## 11. 用户规则
-
-用户可以在迁移过程中持续增加或修改规则，包括：
-
-- 禁止使用某个工具；
-- 某场景必须使用指定工具；
-- 禁止新增某个库或状态方案；
-- 必须复用目标项目已有能力；
-- 指定测试/验证方式；
-- 修改 API contract、权限或业务规则前必须询问。
+## 14. 用户规则
 
 规则结构：
 
@@ -386,93 +426,82 @@ Slice 可以覆盖一个完整 Feature，也可以只覆盖一组强关联 Featu
 作用域 + 触发条件 + 强度 + 动作/约束
 ```
 
-强度统一使用：
+强度：
 
 ```text
 必须 / 禁止 / 必须询问 / 建议
 ```
 
-规则状态统一使用：
+状态：
 
 ```text
 生效中 / 已暂停 / 已失效
 ```
 
-如果用户指定“必须使用”的工具当前不可用、无权限或不适用于环境，不得静默换成别的工具。应把相关操作标记为“已阻塞”，说明原因，并询问用户是提供/启用该工具、允许替代方案，还是调整规则。
+必须使用的工具不可用、无权限或不适配环境时，不得静默替换；相关操作标记“已阻塞”，由用户决定启用、替代、修改规则或延后。
 
 详见 `references/10-用户约束与开发规则.md`。
 
-## 12. Migration Workspace 与跨会话恢复
+## 15. 跨会话恢复
 
-`.code-migration/00-迁移状态总览.md` 是恢复入口，不是高于真实代码、测试、用户规则和已确认 Decision 的绝对事实源。
+`.code-migration/00-迁移状态总览.md` 是恢复入口，不是高于真实代码、测试、规则和 Decision 的绝对事实源。
 
-新对话继续迁移时：
+新对话恢复：
 
-1. 恢复总体目标和状态；
-2. 读取所有“生效中”用户规则；
-3. 读取模块/Feature/Feature Item 台账；
-4. 读取当前执行计划；
-5. 核对当前 Git、代码和测试状态；
-6. 不一致时先做最小范围重新校准；
-7. 再从下一推荐动作继续。
+1. 总体状态和 Active Workstreams；
+2. 生效用户规则；
+3. Feature / Feature Item 台账；
+4. Source Behavior / Decision / Workstream Input Baseline；
+5. 当前执行计划；
+6. Git、working tree、代码和测试；
+7. 不一致时最小重新校准。
 
-详细 Workspace、事实源优先级、交接和多 Agent 规则见 `references/09-迁移状态与跨会话协作.md`。
+详见 `references/09-迁移状态与跨会话协作.md`。
 
-## 13. Migration Learning Loop
+## 16. 自动化约束
 
-```text
-Understand → Design → Ledger → Implement → Verify → Learn → Update → Next Slice
-```
-
-代表性切片发现的通用规律，应先修正目标模型、功能台账和后续迁移规则，再扩大范围。
-
-## 14. 自动化约束
-
-Codemod、正则替换或批量脚本只用于可证明的 Mechanical 变化。先在代表性样本验证，再扩大批次。
+Codemod、正则替换或批量脚本只用于可证明的 Mechanical 变化。先代表性样本验证，再扩大批次。
 
 自动修改至少能说明：`What / Why / Scope / Expected Change / Validation / Rollback`。
 
-遇到复杂状态、权限、业务规则、产品变化或多个合法目标实现时停止机械转换。
-
 详见 `references/07-自动化与增量实施.md`。
 
-## 15. 禁止的迁移方式
+## 17. 禁止的迁移方式
 
 - 不按文件或源目录树一一迁移；
 - 不把旧 Store/API abstraction/组件层机械复刻；
-- 不因为旧代码存在就自动恢复废弃能力；
-- 不把多个源项目中的重复能力分别搬进目标；
-- 不为了兼容复制无必要 Workaround 和技术债；
-- 不同时铺开大量半成品页面或功能；
+- 不因为代码存在就自动恢复废弃能力；
 - 不用 Slice Queue 代替完整功能台账；
-- 不让 Slice“已完成”掩盖未完成的必需 Feature Item；
-- 不用文件数量衡量迁移进度；
-- 不以 build 通过作为唯一完成标准；
-- 不把批准的目标变化当成需要“修回旧行为”的回归；
+- 不让 Slice“已完成”掩盖未完成 Feature Item；
+- 不在关键 Source Behavior 未覆盖时进入大规模实施；
+- 不让多个 Agent 并行写同一 Feature Item、共享契约或无法隔离的工作区；
+- 不因为各 Workstream 单独通过就跳过必要的 Integration Gate；
+- 不让 Implementer 在输入基线过期后继续开发；
 - 不静默违反用户工具/技术/确认规则；
 - 不通过放宽阈值、删除断言或隐藏错误证明迁移成功。
 
-## 16. 文档强度按规模自适应
+## 18. 文档强度按规模自适应
 
 | 范围 | 默认产物 |
 |---|---|
-| 单组件/短任务 | 对话内契约和验证即可 |
-| 单页面且单会话 | 功能台账/详细功能清单 + 简化执行计划 |
-| 长周期页面/业务模块 | 状态总览 + 上下文 + 功能台账 + 执行计划 + 用户规则 |
+| 单组件/短任务 | 对话内行为契约和验证即可 |
+| 单页面且单会话 | 功能台账 + 简化执行计划 |
+| 长周期页面/业务模块 | 状态总览 + 上下文 + 功能台账 + 行为对齐 + 执行计划 + 用户规则 |
 | 多项目融合 | 再增加融合映射和必要 Decision |
-| 整应用迁移 | 完整模块台账、详细语义、规则、交接、切流与清理记录 |
+| 整应用迁移 | 完整模块台账、行为契约、规则、Workstreams、交接、集成验证、切流与清理记录 |
 
-文档服务于迁移，不为形式机械创建全部模板。
+文档服务于迁移，不机械创建全部模板。
 
-## 17. 结束报告
+## 19. 结束报告
 
 至少说明：
 
-1. 总体目标与本轮实际完成的目标能力；
-2. 当前 Feature / Feature Items 的中文状态；
-3. 验证证据和批准变化；
-4. 已阻塞 / 已延后 / Unknown / 必须询问；
-5. 生效中的关键用户规则及是否有例外；
-6. Temporary Architecture 和退出条件；
-7. 下一推荐 Slice 及原因；
-8. 长周期任务的 `.code-migration/` 是否已同步。
+1. 总体目标与本轮完成的目标能力；
+2. 当前 Feature / Feature Items 状态；
+3. Source Behavior Coverage 和批准变化；
+4. Workstream / Owner / Input Baseline；
+5. Workstream Validation / Integration Gate 结果；
+6. 已阻塞 / 已延后 / 必须询问；
+7. 生效关键用户规则；
+8. 下一推荐 Slice / Workstream；
+9. `.code-migration/` 是否已同步。
