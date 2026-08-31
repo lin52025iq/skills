@@ -1,4 +1,35 @@
-# 前端项目迁移 Skill
+# Skills
+
+这个仓库用于维护面向 AI 编程代理的工程 Skill。
+
+## code-migration
+
+`code-migration` 用于将一个或多个现有项目中的功能、业务规则和用户能力迁移、融合或重构到目标项目。
+
+它不是文件搬运或框架语法翻译工具，而是按以下模型工作：
+
+```text
+Source Evidence
+→ Desired Target Behavior
+→ Target-native Design
+→ Incremental Implementation & Verification
+```
+
+核心能力包括：
+
+- 从源项目恢复真实功能、Business Rule、Invariant、数据契约与生命周期；
+- 根据用户迁移意图和目标产品要求确定真正需要的目标行为；
+- 多项目场景下建立 Canonical Feature Model，处理重复能力与冲突；
+- 复用目标项目已有 Router、状态、数据、组件、权限和测试惯例，而不是复制源架构；
+- 支持 Layout-first、Feature-first、Representative-slice-first 等前端迁移顺序；
+- 按可验证功能切片推进，区分 `IMPLEMENTING / VERIFYING / MIGRATED / ELIMINATED`；
+- 使用 `.code-migration/` 持久化长周期迁移状态，支持新对话恢复、澄清、Handoff 和 Reconcile；
+- 区分 Mechanical / Semantic / Product 变化，限制 Codemod 自动化边界；
+- 对批准的目标变化使用 `APPROVED_CHANGE`，验证面向目标行为而不是默认追求旧系统等价。
+
+主入口：[`code-migration/SKILL.md`](code-migration/SKILL.md)
+
+## project-migration
 
 `project-migration` 是面向 AI 编程代理的前端迁移执行 Skill。它覆盖从只读审计、迁移规划、跨框架实施，到视觉回归、渐进切流、回滚和旧实现清理的完整闭环。
 
@@ -104,6 +135,7 @@ project-migration/
 
 ```bash
 python tools/validate_skill.py project-migration
+python tools/validate_skill.py code-migration
 ```
 
-仓库 CI 会检查 frontmatter、主文件长度、内部链接、`agents/openai.yaml`、Python 脚本和评测集结构。
+仓库 CI 会检查 Skill frontmatter、主文件长度、内部链接、`agents/openai.yaml`、脚本和评测集结构。

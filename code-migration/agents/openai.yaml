@@ -1,0 +1,4 @@
+interface:
+  display_name: "代码迁移"
+  short_description: "基于源项目证据确定目标行为，并按目标架构进行多项目融合与增量迁移"
+  default_prompt: "使用 $code-migration 先恢复源项目真实能力与约束，再结合用户意图确定 Desired Target Behavior，按目标仓库架构逐个功能切片重建、验证，并维护必要的跨会话迁移状态。"
