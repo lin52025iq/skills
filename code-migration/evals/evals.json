@@ -108,6 +108,21 @@
         "用户回答会被持久化到 `.code-migration/`，而不是只存在聊天上下文。",
         "不会重复询问已记录有明确答案的问题，也不会静默采用任一旧项目行为。"
       ]
+    },
+    {
+      "id": 9,
+      "name": "session-handoff-and-reconcile",
+      "prompt": "这轮订单详情迁移做到一半我要先结束对话。当前有几个未提交文件，测试只跑了一部分。下次我会开一个新对话继续。另外上次的 `.code-migration/` 可能已经比代码落后了一点。",
+      "expected_output": "结束前执行 Session Handoff Gate：把真实代码状态、已验证/未验证部分、未提交文件、当前 Slice、Blocked、下一动作和 Git 基线写入 `.code-migration/00-迁移状态总览.md` 与执行计划；若无法确认文档与代码一致则标记 RECONCILE_REQUIRED。新对话先做最小 Reconcile，修正状态后再继续开发。",
+      "files": [],
+      "assertions": [
+        "不会把半完成代码记录成 DONE/MIGRATED。",
+        "交接时记录 Branch、Last Related Commit、Working Tree、Current Code State、Tests/Validation 和 Pending Work。",
+        "状态无法确认一致时使用 RECONCILE_REQUIRED，而不是假设文档正确。",
+        "新对话先核对当前 Slice 的 Git/代码与迁移文档，再决定从哪里继续。",
+        "Reconcile 只扩大到确认当前状态所需的最小范围，不重新扫描所有源项目。",
+        "完成交接后 Recommended Next Action 和 Files/Modules To Read First 足够让新对话直接续接。"
+      ]
     }
   ]
 }
