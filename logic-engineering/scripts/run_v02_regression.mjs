@@ -7,7 +7,7 @@ import {readJson} from './lib/model.mjs';
 const DIR=path.dirname(new URL(import.meta.url).pathname),ROOT=path.resolve(DIR,'..'),FIX=path.join(ROOT,'evals','fixtures'),SCHEMAS=path.join(ROOT,'schemas');
 function run(script,args,label){const p=spawnSync(process.execPath,[path.join(DIR,script),...args],{encoding:'utf8'});return{label,ok:p.status===0,returncode:p.status,stdout:(p.stdout??'').slice(-1500),stderr:(p.stderr??'').slice(-1500)}}
 function assertCheck(label,ok){return{label,ok,returncode:ok?0:1,stdout:'',stderr:''}}
-const model=path.join(FIX,'order-cancel.v0.2.valid.json'),decisionModel=path.join(FIX,'order-routing.decision.v0.2.json'),profile=path.join(FIX,'ts-sqlite.target-profile.json'),change=path.join(FIX,'order-cancel.add-paid.change-set.json'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'logic-v02-reg-')),checks=[];
+const model=path.join(FIX,'order-cancel.v0.2.valid.json'),decisionModel=path.join(FIX,'order-routing.decision.v0.2.json'),foreachModel=path.join(FIX,'order-items.foreach.v0.2.json'),profile=path.join(FIX,'ts-sqlite.target-profile.json'),change=path.join(FIX,'order-cancel.add-paid.change-set.json'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'logic-v02-reg-')),checks=[];
 
 checks.push(run('schema_validate.mjs',[model,path.join(SCHEMAS,'clm-v0.2.schema.json')],'CLM Schema'));
 checks.push(run('logic_cli.mjs',['validate-clm',model],'CLM Semantic'));
@@ -51,5 +51,24 @@ try{
 checks.push(assertCheck('IIR Decision 展开 then/else',decisionExpanded));
 checks.push(assertCheck('TypeScript Decision 生成 if/else',ifElse));
 checks.push(assertCheck('Decision 两个 Scenario 可执行',decisionTests));
+
+const foreachDir=path.join(tmp,'foreach');fs.mkdirSync(foreachDir,{recursive:true});
+checks.push(run('schema_validate.mjs',[foreachModel,path.join(SCHEMAS,'clm-v0.2.schema.json')],'Foreach CLM Schema'));
+checks.push(run('logic_cli.mjs',['validate-clm',foreachModel],'Foreach CLM Semantic'));
+checks.push(run('logic_cli.mjs',['test-vectors',foreachModel,'-o',path.join(foreachDir,'tests.json')],'Foreach 测试向量'));
+checks.push(run('compile_iir.mjs',[foreachModel,profile,'-o',path.join(foreachDir,'iir.json')],'Foreach IIR 编译'));
+checks.push(run('schema_validate.mjs',[path.join(foreachDir,'iir.json'),path.join(SCHEMAS,'iir-v0.2.schema.json')],'Foreach IIR Schema'));
+checks.push(run('logic_cli.mjs',['validate-iir',path.join(foreachDir,'iir.json')],'Foreach IIR Semantic'));
+checks.push(run('compile_target_tests.mjs',[path.join(foreachDir,'tests.json'),path.join(foreachDir,'iir.json'),'-o',path.join(foreachDir,'target-tests.json')],'Foreach Target Test Plan'));
+checks.push(run('generate_typescript_v02.mjs',[path.join(foreachDir,'iir.json'),path.join(foreachDir,'target-tests.json'),'-o',path.join(foreachDir,'generated-ts')],'Foreach TypeScript 生成'));
+checks.push(run('validate_generated_typescript.mjs',[path.join(foreachDir,'generated-ts')],'Foreach TypeScript 质量'));
+let foreachIir=false,foreachTs=false,arrayType=false;
+try{
+  const iir=readJson(path.join(foreachDir,'iir.json')).iir,step=iir.use_cases?.[0]?.steps?.[0];foreachIir=step?.kind==='foreach'&&step.collection_ref==='domain.order.items'&&step.item_alias==='item'&&step.item_type==='domain.order_item'&&step.do_steps?.[0]?.scope?.alias==='item';
+  const domain=fs.readFileSync(path.join(foreachDir,'generated-ts','domain','generated.ts'),'utf8'),source=fs.readFileSync(path.join(foreachDir,'generated-ts','usecases','generated.ts'),'utf8');arrayType=domain.includes('items: OrderItem[];');foreachTs=source.includes('for (const item of input.order.items)')&&source.includes('if (!(item.reserved === true)) continue;')&&source.includes('item.released = true;');
+}catch{}
+checks.push(assertCheck('IIR Foreach 保留 typed item scope',foreachIir));
+checks.push(assertCheck('TypeScript 多值字段生成数组类型',arrayType));
+checks.push(assertCheck('TypeScript Foreach 生成局部循环逻辑',foreachTs));
 
 const ok=checks.every(x=>x.ok);console.log(JSON.stringify({ok,checks},null,2));fs.rmSync(tmp,{recursive:true,force:true});process.exit(ok?0:1);
