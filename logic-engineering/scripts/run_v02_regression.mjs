@@ -17,7 +17,7 @@ checks.push(run('logic_cli.mjs',['compile-iir',model,profile,'-o',path.join(tmp,
 checks.push(run('schema_validate.mjs',[path.join(tmp,'iir.json'),path.join(SCHEMAS,'iir-v0.2.schema.json')],'IIR Schema'));
 checks.push(run('logic_cli.mjs',['validate-iir',path.join(tmp,'iir.json')],'IIR Semantic'));
 checks.push(run('logic_cli.mjs',['target-tests',path.join(tmp,'tests.json'),path.join(tmp,'iir.json'),'-o',path.join(tmp,'target-tests.json')],'Target Test Plan'));
-checks.push(run('logic_cli.mjs',['generate-ts',path.join(tmp,'iir.json'),path.join(tmp,'target-tests.json'),'-o',path.join(tmp,'generated-ts')],'TypeScript + SQLite 生成'));
+checks.push(run('generate_typescript.mjs',[path.join(tmp,'iir.json'),path.join(tmp,'target-tests.json'),'-o',path.join(tmp,'generated-ts')],'TypeScript + SQLite 生成'));
 checks.push(run('logic_cli.mjs',['verify-manifest',path.join(tmp,'generated-ts')],'Manifest 漂移校验'));
 checks.push(run('apply_change_set.mjs',[model,change,'-o',path.join(tmp,'changed.json'),'--diff-output',path.join(tmp,'change-diff.json')],'Change Set 原子应用'));
 checks.push(run('schema_validate.mjs',[path.join(tmp,'changed.json'),path.join(SCHEMAS,'clm-v0.2.schema.json')],'变更后 CLM Schema'));
