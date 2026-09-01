@@ -9,7 +9,7 @@
 - Constraint → transaction / concurrency / idempotency requirement
 - Primitive → target binding
 
-IIR 仍与具体源代码文本解耦，后续 generator 再根据 Target Profile 生成代码。
+节点索引统一使用 clm_model.py，避免 rules / decisions / actions 被遗漏。
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterable
+from typing import Any, Dict
 
-COLLECTIONS = ("domain", "behaviors", "states", "effects", "constraints", "scenarios", "primitives")
+from clm_model import build_node_index, root_of
 
 
 def load_json(path: Path) -> Dict[str, Any]:
@@ -28,17 +28,6 @@ def load_json(path: Path) -> Dict[str, Any]:
 
 def save_json(path: Path, value: Dict[str, Any]) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-
-def iter_nodes(root: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
-    for c in COLLECTIONS:
-        for node in root.get(c, []) or []:
-            if isinstance(node, dict):
-                yield node
-
-
-def index_nodes(root: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    return {n["id"]: n for n in iter_nodes(root) if n.get("id")}
 
 
 def compile_target_profile(profile: Dict[str, Any]) -> Dict[str, Any]:
@@ -56,11 +45,11 @@ def compile_target_profile(profile: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def compile_rule(rule: Dict[str, Any]) -> Dict[str, Any]:
-    if "conditions" in rule:
-        condition = {
-            "operator": rule.get("operator"),
-            "conditions": rule.get("conditions", []),
-        }
+    condition: Dict[str, Any]
+    if "expression" in rule:
+        condition = {"expression": rule.get("expression")}
+    elif "conditions" in rule:
+        condition = {"operator": rule.get("operator"), "conditions": rule.get("conditions", [])}
     else:
         condition = {
             "operator": rule.get("operator"),
@@ -118,22 +107,10 @@ def compile_decision(decision: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def compile_constraint(c: Dict[str, Any]) -> Dict[str, Any]:
-    result = {
-        "semantic_id": c.get("id"),
-        "kind": c.get("kind"),
-    }
+    result = {"semantic_id": c.get("id"), "kind": c.get("kind")}
     for key in (
-        "expression",
-        "trigger",
-        "requirement",
-        "time_bound",
-        "resource",
-        "scope",
-        "policy",
-        "actions",
-        "guarantee",
-        "operation",
-        "key",
+        "expression", "trigger", "requirement", "time_bound", "resource",
+        "scope", "policy", "actions", "guarantee", "operation", "key",
     ):
         if key in c:
             result[key] = c[key]
@@ -189,8 +166,8 @@ def compile_primitive_bindings(root: Dict[str, Any], profile: Dict[str, Any]) ->
 
 
 def compile_iir(clm: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
-    root = clm.get("clm", clm)
-    idx = index_nodes(root)
+    root = root_of(clm)
+    idx = build_node_index(root)
     iir = {
         "iir": {
             "source_clm_id": root.get("id"),
@@ -222,6 +199,7 @@ def compile_iir(clm: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
                         "from": t.get("from"),
                         "to": t.get("to"),
                         "trigger": t.get("trigger"),
+                        "guard": t.get("guard"),
                     })
                 else:
                     transitions.append({"semantic_id": ref, "unresolved": True})
@@ -233,7 +211,6 @@ def compile_iir(clm: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
 
     out["primitive_bindings"] = compile_primitive_bindings(root, profile)
 
-    # 汇总未解析项，generator 不得静默忽略。
     for use_case in out["use_cases"]:
         for guard in use_case["guards"]:
             if guard.get("unresolved"):
@@ -241,6 +218,9 @@ def compile_iir(clm: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
         for step in use_case["steps"]:
             if step.get("unresolved"):
                 out["unresolved"].append(step["semantic_id"])
+            for effect in step.get("effects", []) or []:
+                if effect.get("unresolved"):
+                    out["unresolved"].append(effect["semantic_id"])
     for binding in out["primitive_bindings"]:
         if not binding["resolved"]:
             out["unresolved"].append(binding["semantic_id"])
