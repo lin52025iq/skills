@@ -31,7 +31,7 @@ description: 将现有项目中的模块级业务实现重建为与编程语言�
 7. **大模型负责提出，确定性工具负责裁决。** Schema、类型、引用、测试、验证器比“模型觉得正确”优先。
 8. **业务语义与技术实现分离。** 事务、幂等、顺序、互斥等要求进入 CLM；具体框架绑定进入 IIR / Target Profile。
 9. **测试从 CLM 独立派生。** 不从生成代码反推预期结果。
-10. **存在 unresolved 时不得宣称实现完整匹配。**
+10. **存在 blocking unresolved 时不得宣称实现完整匹配。**
 
 ## 2. 四类工作模式
 
@@ -183,12 +183,14 @@ python scripts/render_human_logic.py model.json -o logic.md
 └─ 更新 Constraint
 ```
 
-整个变更集必须全部成功或全部失败。
+整个变更集必须全部成功或全部失败；重要变更集优先带 `base_model_version + base_semantic_hash`。
 
 规范和工具：
 
+- `references/semantic-change-set.md`
 - `schemas/semantic-change-set-v0.2.schema.json`
 - `scripts/apply_semantic_change_set.py`
+- `scripts/semantic_hash.py`
 
 自由自然语言修改只能先转换成 Patch / Change Set Proposal，再应用。
 
@@ -221,6 +223,7 @@ Schema
 → 引用完整性
 → Symbol Table
 → Typed Expression
+→ Typed Action / Scenario
 → 枚举类型和值
 → 基础类型兼容
 → 状态迁移一致性
@@ -253,7 +256,7 @@ python scripts/generate_test_vectors.py model.json --output tests.json
 
 详细规则见 `references/test-vector-generation.md`。
 
-## 12. 实现投影
+## 12. 实现投影与目标测试
 
 生成链路固定为：
 
@@ -261,20 +264,46 @@ python scripts/generate_test_vectors.py model.json --output tests.json
 CLM
 → Target Profile
 → Primitive Binding
-→ Implementation IR（IIR）
+→ IIR v0.2
+→ IIR Validation
+→ Target Test Plan
 → Target Generator
 ```
 
 ```bash
 python scripts/compile_iir.py model.json target-profile.json -o implementation.iir.json
+python scripts/validate_iir.py implementation.iir.json --schema schemas/iir-v0.2.schema.json
+python scripts/compile_target_tests.py tests.json implementation.iir.json -o target-test-plan.json
 ```
 
-IIR 只负责技术组织，不得改变业务规则。
+IIR 只负责技术组织，不得改变业务规则。`blocking unresolved` 非空时禁止进入目标代码生成。
 
 详见：
 
-- `references/implementation-ir.md`
+- `references/iir-v0.2.md`
+- `references/target-test-generation.md`
 - `references/verification-and-generation.md`
+
+### Go 目标生成
+
+当前第一种目标生成器为 Go v0.1：
+
+```bash
+python scripts/generate_go.py implementation.iir.json target-test-plan.json -o generated-go
+python scripts/verify_generated_manifest.py generated-go
+```
+
+Go Generator 只在以下条件满足时执行：
+
+```text
+IIR v0.2 校验通过
+blocking unresolved = 0
+Target Profile language = Go
+```
+
+第一版只生成高度确定的 Use Case、Repository/External Port interface、Typed Error、Manifest 和 testify 测试骨架；第三方 SDK、未绑定 Primitive 和复杂基础设施不得自行猜测。
+
+详见 `references/go-generator-v0.1.md`。
 
 ## 13. 最小统一流水线
 
@@ -282,8 +311,16 @@ IIR 只负责技术组织，不得改变业务规则。
 
 ```bash
 python scripts/run_logic_pipeline.py model.json \
-  --patch patch.json \
+  --change-set change-set.json \
   --target-profile target-profile.json
+```
+
+需要进入 Go 生成阶段时：
+
+```bash
+python scripts/run_logic_pipeline.py model.json \
+  --target-profile target-profile.json \
+  --generate-go
 ```
 
 流水线执行：
@@ -297,7 +334,11 @@ python scripts/run_logic_pipeline.py model.json \
 → Symbol Table
 → 中文逻辑投影
 → Test Vectors
-→ IIR
+→ IIR v0.2
+→ IIR Validation
+→ Target Test Plan
+→ 可选 Go Generator
+→ Generated Manifest Verification
 ```
 
 任一步失败都应终止，不继续生成“看起来合理”的后续结果。
@@ -341,13 +382,23 @@ Semantic Diff
 Impact Analysis
 Symbol Table
 Test Vectors
-Target Profile / IIR
+Target Profile / IIR v0.2
+IIR Validation Result
+Target Test Plan
+Generated Manifest（生成目标代码时）
 Verification Result
 ```
 
 不要为了形式生成所有文件。
 
-## 16. 禁止事项
+## 16. 废弃资产与兼容策略
+
+- 已被 v0.2 完整替代、且没有迁移价值的说明文档应直接删除，不保留重复主规范。
+- CLM v0.1 的 JSON Schema 与迁移脚本暂时保留，仅用于旧模型兼容与迁移。
+- 新功能不得继续扩展 v0.1；需要新语义时升级 v0.2 或后续版本。
+- 删除规范后必须检查主 Skill、Agent prompt 和 references 是否存在死链。
+
+## 17. 禁止事项
 
 - 不把当前文件摘要当模块完整逻辑。
 - 不把函数名直译当业务解释。
@@ -357,5 +408,6 @@ Verification Result
 - 不从 generated code 生成 expected tests。
 - 不把框架特有语法直接写入领域规则。
 - 不因为文本相似就强行抽公共规则。
-- 不在 `unresolved` 非空时宣称实现完整。
+- 不在 `blocking unresolved` 非空时宣称实现完整。
+- 不绕过 IIR Validator 直接调用目标代码生成器。
 - 不宣称“CLM 正确即可自动证明任何生成实现都正确”；必须说明实际验证层级。
