@@ -1,0 +1,45 @@
+{
+  "suite": "go-generator-v0.1",
+  "cases": [
+    {
+      "id": "go.generator.requires-valid-iir",
+      "expect": [
+        "IIR schema invalid 时拒绝生成",
+        "IIR blocking unresolved 非空时拒绝生成",
+        "Target Profile language 不是 Go 时拒绝生成"
+      ]
+    },
+    {
+      "id": "go.generator.interfaces",
+      "expect": [
+        "repository_contracts 生成 Go interface",
+        "external_ports 生成 Go interface",
+        "不生成真实第三方 SDK 调用代码"
+      ]
+    },
+    {
+      "id": "go.generator.usecase-order",
+      "expect": [
+        "Use Case 依赖只来自 IIR dependencies",
+        "guards 在 steps 前出现",
+        "生成骨架保留 Semantic ID 可追踪信息"
+      ]
+    },
+    {
+      "id": "go.generator.tests",
+      "expect": [
+        "测试骨架只消费 Target Test Plan",
+        "Given/When/Expect 信息被保留",
+        "未知 fixture 只生成 TODO，不虚构领域数据"
+      ]
+    },
+    {
+      "id": "go.generator.manifest",
+      "expect": [
+        "manifest 包含 generator/source_clm/source_semantic_hash/iir_version/target_profile",
+        "每个 artifact 有 path/semantic_refs/content_hash",
+        "verify_generated_manifest.py 能检测人工漂移"
+      ]
+    }
+  ]
+}
