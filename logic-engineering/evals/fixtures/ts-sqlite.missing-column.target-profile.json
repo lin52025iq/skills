@@ -1,0 +1,27 @@
+{
+  "target_profile": {
+    "id": "ts-sqlite-missing-column",
+    "language": "TypeScript",
+    "version": "5.x",
+    "runtime": "Node.js",
+    "framework": "framework-agnostic",
+    "architecture": "Clean Architecture",
+    "persistence": "SQLite",
+    "persistence_generation": "explicit_mapping",
+    "persistence_mappings": {
+      "domain.order": {
+        "table": "orders",
+        "primary_key": "domain.order.id",
+        "columns": {
+          "domain.order.id": "id",
+          "domain.order.status": "status"
+        }
+      }
+    },
+    "messaging": "none",
+    "transaction_strategy": "sqlite_transaction",
+    "error_model": "typed_errors",
+    "test_framework": "Vitest",
+    "binding_key": "ts-sqlite-missing-column"
+  }
+}
