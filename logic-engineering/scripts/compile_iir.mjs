@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import {readJson,writeJson,rootOf,buildNodeIndex,buildSymbolTable,semanticHash,collectionElementScope,resolveScopedRef} from './lib/model.mjs';
+import {readJson,writeJson,rootOf,buildNodeIndex,buildSymbolTable,semanticHash,collectionElementScope,resolveScopedRef,valueType} from './lib/model.mjs';
 
-function pascal(value){return String(value??'Generated').split(/[^A-Za-z0-9]+/).filter(Boolean).map(x=>x[0].toUpperCase()+x.slice(1)).join('')||'Generated';}
-function camel(value){const p=pascal(value);return p[0].toLowerCase()+p.slice(1);}
-function entityOfField(ref){const parts=String(ref).split('.');return parts.length>=3?parts.slice(0,2).join('.'):null;}
+const pascal=(value)=>String(value??'Generated').split(/[^A-Za-z0-9]+/).filter(Boolean).map(x=>x[0].toUpperCase()+x.slice(1)).join('')||'Generated';
+const camel=(value)=>{const p=pascal(value);return p[0].toLowerCase()+p.slice(1);};
+const entityOfField=(ref)=>{const p=String(ref).split('.');return p.length>=3?p.slice(0,2).join('.'):null;};
+const safeSqlIdentifier=(v)=>typeof v==='string'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(v);
 function collectRefs(v,out=new Set()){if(Array.isArray(v))for(const x of v)collectRefs(x,out);else if(v&&typeof v==='object'){if(typeof v.ref==='string')out.add(v.ref);for(const x of Object.values(v))collectRefs(x,out);}return out;}
 function collectGlobalRefs(v,symbols,scope,out=new Set()){
   if(Array.isArray(v)){for(const x of v)collectGlobalRefs(x,symbols,scope,out);return out;}
@@ -13,7 +14,10 @@ function collectGlobalRefs(v,symbols,scope,out=new Set()){
   }
   return out;
 }
-function safeSqlIdentifier(value){return typeof value==='string'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(value);}
+function describeValue(v,symbols){
+  let cardinality='one';if(Array.isArray(v?.list)||Array.isArray(v?.set))cardinality='many';else if(v?.ref)cardinality=symbols[v.ref]?.cardinality??'one';
+  return{type_ref:valueType(v,symbols)??null,cardinality};
+}
 
 function compileDomain(root){
   const enums=[],entities=[],runtime=[];
@@ -30,19 +34,28 @@ function compileDomain(root){
   return{domain_types:{enums,entities},runtime_bindings:runtime};
 }
 
-function repositoryId(resource){const entity=entityOfField(resource)??resource;return`repository.${String(entity??'resource').replace(/^domain\./,'').replace(/\./g,'_')}`;}
-function compileContracts(root){
+const repositoryId=(resource)=>`repository.${String(entityOfField(resource)??resource??'resource').replace(/^domain\./,'').replace(/\./g,'_')}`;
+function compileContracts(root,symbols,unresolved){
   const repoMap=new Map(),portMap=new Map();
-  for(const e of root.effects??[]){
-    if(['read','write','persist'].includes(e.kind)){
-      const entityRef=entityOfField(e.resource)??e.resource??'domain.unknown',id=repositoryId(e.resource);
+  for(const effect of root.effects??[]){
+    if(['read','write','persist'].includes(effect.kind)){
+      const entityRef=entityOfField(effect.resource)??effect.resource??'domain.unknown',id=repositoryId(effect.resource);
       if(!repoMap.has(id))repoMap.set(id,{id,kind:'repository_contract',entity_ref:entityRef,semantic_refs:[],operations:[],binding:{strategy:'repository',provider:null,mapping:null}});
-      const repo=repoMap.get(id);repo.semantic_refs.push(e.id);const name=e.kind==='read'?'load':'save';if(!repo.operations.some(x=>x.name===name))repo.operations.push({name,semantic_refs:[e.id]});
-    }else if(['external_call','emit','schedule'].includes(e.kind)){
-      const system=e.system??(e.kind==='emit'?'event_bus':e.kind),id=`port.${String(system).replace(/[^A-Za-z0-9_.-]/g,'_')}`;
-      if(!portMap.has(id))portMap.set(id,{id,kind:'external_port',system,semantic_refs:[],operations:[],generation_mode:'contract_only'});
-      const port=portMap.get(id);port.semantic_refs.push(e.id);const name=e.operation??(e.kind==='emit'?'publish':'execute');if(!port.operations.some(x=>x.name===name))port.operations.push({name,semantic_refs:[e.id]});
+      const repo=repoMap.get(id);repo.semantic_refs.push(effect.id);const name=effect.kind==='read'?'load':'save';
+      let op=repo.operations.find(x=>x.name===name);if(!op){op={name,semantic_refs:[]};repo.operations.push(op);}op.semantic_refs.push(effect.id);continue;
     }
+    if(!['external_call','emit','schedule'].includes(effect.kind))continue;
+    const system=effect.system??(effect.kind==='emit'?'event_bus':effect.kind),id=`port.${String(system).replace(/[^A-Za-z0-9_.-]/g,'_')}`,name=effect.operation??(effect.kind==='emit'?'publish':'execute');
+    if(!portMap.has(id))portMap.set(id,{id,kind:'external_port',system,semantic_refs:[],operations:[],generation_mode:'contract_only'});
+    const port=portMap.get(id);port.semantic_refs.push(effect.id);
+    const parameters=(effect.arguments??[]).map(arg=>({name:arg.name,...describeValue(arg.value,symbols),value:structuredClone(arg.value)}));
+    const signature=parameters.map(x=>({name:x.name,type_ref:x.type_ref,cardinality:x.cardinality}));
+    let op=port.operations.find(x=>x.name===name);
+    if(!op){op={name,semantic_refs:[],parameters,failure_refs:[...(effect.failure_refs??[])],return_type:null};port.operations.push(op);}
+    else if(JSON.stringify(op.parameters.map(x=>({name:x.name,type_ref:x.type_ref,cardinality:x.cardinality})))!==JSON.stringify(signature)){
+      unresolved.push({semantic_ref:effect.id,reason:`External Port ${id}.${name} 出现不兼容参数签名`,required_for:id,severity:'blocking'});
+    }
+    op.semantic_refs.push(effect.id);op.failure_refs=[...new Set([...(op.failure_refs??[]),...(effect.failure_refs??[])])];
   }
   return{repositories:[...repoMap.values()],ports:[...portMap.values()]};
 }
@@ -61,7 +74,7 @@ function attachPersistenceMappings(repositories,profile,symbols,unresolved){
     const columns=mapping.columns;
     if(!columns||typeof columns!=='object'||Array.isArray(columns)){unresolved.push({semantic_ref:repo.entity_ref,reason:'persistence mapping.columns 必须是对象',required_for:repo.id,severity:'blocking'});continue;}
     const entityFields=Object.values(symbols).filter(x=>x.kind==='field'&&x.owner===repo.entity_ref).map(x=>x.id);
-    for(const field of entityFields){if(!Object.hasOwn(columns,field))unresolved.push({semantic_ref:field,reason:`显式 save mapping 缺少字段 column: ${field}`,required_for:repo.id,severity:'blocking'});}
+    for(const field of entityFields)if(!Object.hasOwn(columns,field))unresolved.push({semantic_ref:field,reason:`显式 save mapping 缺少字段 column: ${field}`,required_for:repo.id,severity:'blocking'});
     for(const [field,column] of Object.entries(columns)){
       const symbol=symbols[field];if(!symbol||symbol.kind!=='field'||symbol.owner!==repo.entity_ref)unresolved.push({semantic_ref:field,reason:`column mapping 引用了不属于 ${repo.entity_ref} 的字段`,required_for:repo.id,severity:'blocking'});
       if(!safeSqlIdentifier(column))unresolved.push({semantic_ref:field,reason:`非法 SQLite column 名: ${column}`,required_for:repo.id,severity:'blocking'});
@@ -74,14 +87,9 @@ function compilePlans(root,profile,unresolved){
   const transaction_plans=[],concurrency_plans=[],retry_plans=[],idempotency_plans=[],behaviors=new Map((root.behaviors??[]).map(x=>[x.id,x]));
   for(const c of root.constraints??[]){
     if(c.kind==='atomicity'){
-      const strategy=profile.transaction_strategy??null,behavior=behaviors.get(c.behavior_ref),members=[...(c.members??[])];
-      let start_index=null,end_index=null,boundary_valid=true;
+      const strategy=profile.transaction_strategy??null,behavior=behaviors.get(c.behavior_ref),members=[...(c.members??[])];let start_index=null,end_index=null,boundary_valid=true;
       if(!behavior){unresolved.push({semantic_ref:c.id,reason:`atomicity.behavior_ref 不存在或不是 Behavior: ${c.behavior_ref??'<missing>'}`,required_for:c.id,severity:'blocking'});boundary_valid=false;}
-      else{
-        const flow=behavior.flow??[],positions=members.map(x=>flow.indexOf(x));
-        if(!members.length||positions.some(x=>x<0)){unresolved.push({semantic_ref:c.id,reason:'atomicity.members 必须全部属于 behavior 顶层 flow',required_for:c.behavior_ref,severity:'blocking'});boundary_valid=false;}
-        else{start_index=Math.min(...positions);end_index=Math.max(...positions);const expected=flow.slice(start_index,end_index+1);if(expected.length!==members.length||expected.some((x,i)=>x!==members[i])){unresolved.push({semantic_ref:c.id,reason:'atomicity.members 必须按 behavior flow 顺序形成连续区间',required_for:c.behavior_ref,severity:'blocking'});boundary_valid=false;}}
-      }
+      else{const flow=behavior.flow??[],positions=members.map(x=>flow.indexOf(x));if(!members.length||positions.some(x=>x<0)){unresolved.push({semantic_ref:c.id,reason:'atomicity.members 必须全部属于 behavior 顶层 flow',required_for:c.behavior_ref,severity:'blocking'});boundary_valid=false;}else{start_index=Math.min(...positions);end_index=Math.max(...positions);const expected=flow.slice(start_index,end_index+1);if(expected.length!==members.length||expected.some((x,i)=>x!==members[i])){unresolved.push({semantic_ref:c.id,reason:'atomicity.members 必须按 behavior flow 顺序形成连续区间',required_for:c.behavior_ref,severity:'blocking'});boundary_valid=false;}}}
       transaction_plans.push({id:`plan.${c.id}`,kind:'transaction_plan',semantic_refs:[c.id],behavior_ref:c.behavior_ref??null,members,strategy,provider:profile.persistence??null,start_index,end_index,boundary_valid});
       if(!strategy)unresolved.push({semantic_ref:c.id,reason:'Target Profile 缺少 transaction_strategy',required_for:c.id,severity:'blocking'});
     }else if(c.kind==='concurrency'){
@@ -116,23 +124,25 @@ function collectStepGlobalRefs(step,symbols,scope,out=new Set()){
 }
 
 function compileUseCases(root,index,symbols,repositories,ports,transactionPlans,unresolved){
-  const use_cases=[];
+  const use_cases=[],effectsById=new Map((root.effects??[]).map(x=>[x.id,x]));
   for(const b of root.behaviors??[]){
     const guards=[],refs=new Set();
     for(const id of b.preconditions??[]){const n=index.get(id);if(!n){unresolved.push({semantic_ref:id,reason:'Behavior precondition 节点不存在',required_for:b.id,severity:'blocking'});continue;}guards.push({semantic_ref:id,expression:n.expression??null,failure_ref:n.failure??null});collectRefs(n.expression,refs);}
     const steps=(b.flow??[]).map(id=>compileStep(id,index,symbols,unresolved,b.id));for(const step of steps)collectStepGlobalRefs(step,symbols,null,refs);
+    const effectIds=new Set();for(const step of steps)collectEffects(step,effectIds);
+    for(const effectId of effectIds){const effect=effectsById.get(effectId);if(effect?.arguments)collectGlobalRefs(effect.arguments,symbols,null,refs);}
     for(const post of b.postconditions??[]){const n=index.get(post);if(n?.expression)collectRefs(n.expression,refs);}
-    const inputEntities=[...new Set([...refs].map(entityOfField).filter(entity=>entity&&symbols[entity]?.kind==='entity'))],effectIds=new Set();for(const step of steps)collectEffects(step,effectIds);
+    const inputEntities=[...new Set([...refs].map(entityOfField).filter(entity=>entity&&symbols[entity]?.kind==='entity'))];
     const dependencies=[...repositories.filter(x=>x.semantic_refs.some(r=>effectIds.has(r))).map(x=>x.id),...ports.filter(x=>x.semantic_refs.some(r=>effectIds.has(r))).map(x=>x.id)];
     const transaction_plan_ids=transactionPlans.filter(x=>x.behavior_ref===b.id).map(x=>x.id);
     use_cases.push({id:`usecase.${b.id.replace(/^behavior\./,'')}`,kind:'use_case',semantic_refs:[b.id],name:pascal(b.id.replace(/^behavior\./,'')),display_name:b.name??null,input_refs:inputEntities,inputs:inputEntities,guards,steps,outputs:b.outputs??[],failure_refs:b.failures??[],postconditions:b.postconditions??[],dependencies,transaction_plan_ids});
   }
   return use_cases;
 }
-function compileErrors(root){const refs=new Set();for(const b of root.behaviors??[])for(const x of b.failures??[])refs.add(x);for(const r of root.rules??[])if(r.failure)refs.add(r.failure);return[...refs].map(ref=>({id:`error_mapping.${ref.replace(/^error\./,'')}`,semantic_error_ref:ref,target_error:`${pascal(ref.replace(/^error\./,''))}Error`}));}
+function compileErrors(root){const refs=new Set();for(const b of root.behaviors??[])for(const x of b.failures??[])refs.add(x);for(const r of root.rules??[])if(r.failure)refs.add(r.failure);for(const e of root.effects??[])for(const x of e.failure_refs??[])refs.add(x);return[...refs].map(ref=>({id:`error_mapping.${ref.replace(/^error\./,'')}`,semantic_error_ref:ref,target_error:`${pascal(ref.replace(/^error\./,''))}Error`}));}
 
 function compile(clm,profile){
-  const root=rootOf(clm),index=buildNodeIndex(clm),symbols=buildSymbolTable(clm),unresolved=[],domain=compileDomain(root),contracts=compileContracts(root);
+  const root=rootOf(clm),index=buildNodeIndex(clm),symbols=buildSymbolTable(clm),unresolved=[],domain=compileDomain(root),contracts=compileContracts(root,symbols,unresolved);
   attachPersistenceMappings(contracts.repositories,profile,symbols,unresolved);
   const plans=compilePlans(root,profile,unresolved),use_cases=compileUseCases(root,index,symbols,contracts.repositories,contracts.ports,plans.transaction_plans,unresolved),error_mappings=compileErrors(root);
   const generation_regions=[...use_cases.map(u=>({id:`region.${u.id}`,mode:'generated',semantic_refs:u.semantic_refs})),...contracts.repositories.map(r=>({id:`region.${r.id}`,mode:'contract_only',semantic_refs:r.semantic_refs.length?r.semantic_refs:[r.entity_ref]})),...contracts.ports.map(p=>({id:`region.${p.id}`,mode:p.generation_mode,semantic_refs:p.semantic_refs}))];
@@ -141,5 +151,5 @@ function compile(clm,profile){
 }
 
 const [clmFile,profileFile,...args]=process.argv.slice(2),oi=args.indexOf('-o')>=0?args.indexOf('-o'):args.indexOf('--output'),output=oi>=0?args[oi+1]:null;
-if(!clmFile||!profileFile||!output){console.error('usage: node compile_iir.mjs clm.json target-profile.json -o implementation.iir.json');process.exit(2)}
-try{const clm=readJson(clmFile),raw=readJson(profileFile),profile=raw.target_profile??raw;writeJson(output,compile(clm,profile));console.log(JSON.stringify({ok:true,output},null,2));}catch(e){console.error(JSON.stringify({ok:false,error:e.message},null,2));process.exit(1)}
+if(!clmFile||!profileFile||!output){console.error('usage: node compile_iir.mjs clm.json target-profile.json -o implementation.iir.json');process.exit(2);}
+try{const clm=readJson(clmFile),raw=readJson(profileFile),profile=raw.target_profile??raw;writeJson(output,compile(clm,profile));console.log(JSON.stringify({ok:true,output},null,2));}catch(e){console.error(JSON.stringify({ok:false,error:e.message},null,2));process.exit(1);}
