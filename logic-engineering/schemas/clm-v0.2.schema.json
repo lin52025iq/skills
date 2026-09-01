@@ -1,0 +1,294 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/logic-engineering/clm-v0.2.schema.json",
+  "title": "Canonical Logic Model v0.2",
+  "type": "object",
+  "required": ["clm"],
+  "properties": {
+    "clm": { "$ref": "#/$defs/clmRoot" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "semanticId": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]+$"
+    },
+    "nodeBase": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/semanticId" },
+        "kind": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "enum": ["candidate", "canonical", "deprecated"] },
+        "origin": { "enum": ["observed", "inferred", "intended", "user_defined", "generated"] },
+        "confidence": { "enum": ["high", "medium", "low"] },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/semanticId" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "typedValue": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["ref"],
+          "properties": { "ref": { "$ref": "#/$defs/semanticId" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["literal"],
+          "properties": { "literal": {} },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["enum"],
+          "properties": {
+            "enum": {
+              "type": "object",
+              "required": ["type", "value"],
+              "properties": {
+                "type": { "$ref": "#/$defs/semanticId" },
+                "value": {}
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["null"],
+          "properties": { "null": { "const": true } },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "expression": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["op", "items"],
+          "properties": {
+            "op": { "enum": ["all", "any"] },
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/expression" }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "item"],
+          "properties": {
+            "op": { "const": "not" },
+            "item": { "$ref": "#/$defs/expression" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "left", "right"],
+          "properties": {
+            "op": { "enum": ["eq", "ne", "lt", "le", "gt", "ge", "in", "not_in"] },
+            "left": { "$ref": "#/$defs/typedValue" },
+            "right": { "$ref": "#/$defs/typedValue" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "field": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/semanticId" },
+        "type": { "type": "string" },
+        "nullable": { "type": "boolean" },
+        "cardinality": { "enum": ["one", "many"] }
+      },
+      "additionalProperties": true
+    },
+    "domainNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "kind": { "const": "entity" },
+                "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } }
+              },
+              "required": ["fields"]
+            },
+            {
+              "properties": {
+                "kind": { "const": "enum" },
+                "values": { "type": "array", "minItems": 1, "uniqueItems": true }
+              },
+              "required": ["values"]
+            },
+            {
+              "properties": {
+                "kind": { "const": "value_type" },
+                "base_type": { "type": "string" }
+              }
+            },
+            { "properties": { "kind": { "const": "relationship" } } }
+          ]
+        }
+      ]
+    },
+    "behaviorNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "properties": {
+            "kind": { "const": "behavior" },
+            "inputs": { "type": "array" },
+            "preconditions": { "type": "array", "items": { "$ref": "#/$defs/semanticId" } },
+            "flow": { "type": "array", "items": { "$ref": "#/$defs/semanticId" } },
+            "outputs": { "type": "array" },
+            "failures": { "type": "array", "items": { "type": "string" } },
+            "postconditions": { "type": "array", "items": { "$ref": "#/$defs/semanticId" } }
+          }
+        }
+      ]
+    },
+    "ruleNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "properties": {
+            "kind": { "const": "rule" },
+            "expression": { "$ref": "#/$defs/expression" },
+            "failure": { "type": "string" }
+          },
+          "required": ["expression"]
+        }
+      ]
+    },
+    "decisionNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "properties": {
+            "kind": { "const": "decision" },
+            "when": { "$ref": "#/$defs/expression" },
+            "then": { "type": "array", "items": { "$ref": "#/$defs/semanticId" } },
+            "else": { "type": "array", "items": { "$ref": "#/$defs/semanticId" } }
+          },
+          "required": ["when", "then"]
+        }
+      ]
+    },
+    "actionNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "properties": {
+            "kind": { "enum": ["action", "foreach"] },
+            "operation": { "type": "string" },
+            "target": { "type": "string" },
+            "value": {},
+            "effects": { "type": "array", "items": { "$ref": "#/$defs/semanticId" } },
+            "when": { "$ref": "#/$defs/expression" },
+            "do": { "type": "array", "items": { "$ref": "#/$defs/semanticId" } }
+          }
+        }
+      ]
+    },
+    "stateNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "kind": { "const": "state_machine" },
+                "states": { "type": "array", "minItems": 1, "uniqueItems": true },
+                "transitions": { "type": "array", "items": { "$ref": "#/$defs/semanticId" } }
+              },
+              "required": ["states", "transitions"]
+            },
+            {
+              "properties": {
+                "kind": { "const": "transition" },
+                "from": {},
+                "to": {},
+                "trigger": { "$ref": "#/$defs/semanticId" },
+                "guard": { "$ref": "#/$defs/expression" }
+              },
+              "required": ["from", "to", "trigger"]
+            }
+          ]
+        }
+      ]
+    },
+    "effectNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "properties": {
+            "kind": { "enum": ["effect", "read", "write", "persist", "external_call", "emit", "schedule", "cache_read", "cache_write"] },
+            "resource": { "type": "string" },
+            "system": { "type": "string" },
+            "operation": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "constraintNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "properties": {
+            "kind": { "enum": ["constraint", "precondition", "postcondition", "invariant", "uniqueness", "cardinality", "ordering", "temporal", "concurrency", "atomicity", "idempotency", "forbidden_transition"] },
+            "expression": { "$ref": "#/$defs/expression" }
+          }
+        }
+      ]
+    },
+    "genericNode": { "$ref": "#/$defs/nodeBase" },
+    "relation": {
+      "type": "object",
+      "required": ["source", "relation", "target"],
+      "properties": {
+        "source": { "$ref": "#/$defs/semanticId" },
+        "relation": { "type": "string" },
+        "target": { "$ref": "#/$defs/semanticId" }
+      },
+      "additionalProperties": true
+    },
+    "clmRoot": {
+      "type": "object",
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "$ref": "#/$defs/semanticId" },
+        "version": { "type": ["integer", "string"] },
+        "name": { "type": "string" },
+        "domain": { "type": "array", "items": { "$ref": "#/$defs/domainNode" } },
+        "behaviors": { "type": "array", "items": { "$ref": "#/$defs/behaviorNode" } },
+        "rules": { "type": "array", "items": { "$ref": "#/$defs/ruleNode" } },
+        "decisions": { "type": "array", "items": { "$ref": "#/$defs/decisionNode" } },
+        "actions": { "type": "array", "items": { "$ref": "#/$defs/actionNode" } },
+        "states": { "type": "array", "items": { "$ref": "#/$defs/stateNode" } },
+        "effects": { "type": "array", "items": { "$ref": "#/$defs/effectNode" } },
+        "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraintNode" } },
+        "scenarios": { "type": "array", "items": { "$ref": "#/$defs/genericNode" } },
+        "primitives": { "type": "array", "items": { "$ref": "#/$defs/genericNode" } },
+        "relations": { "type": "array", "items": { "$ref": "#/$defs/relation" } },
+        "evidence": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}
