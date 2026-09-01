@@ -129,6 +129,54 @@
       "expected_output": "Discovery 可以判定为足够进入实施，不继续为了证明数学意义上的 100% 完整而无限扫描；仍允许开发中发现新事实后局部重新校准。",
       "files": [],
       "assertions": ["Discovery 有明确停止条件。", "不会无限分析。"]
+    },
+    {
+      "id": 17,
+      "name": "inline-module-upgrades-with-stable-ids",
+      "prompt": "通知设置最初只有一个低风险功能，直接写在顶层 03。后来增加邮件、短信、Webhook、失败重试和独立验证，希望拆成独立模块。",
+      "expected_output": "把该模块从顶层内联升级到 modules/M-xxx-通知设置/，原模块编号、功能编号和原子功能项编号全部保持不变；先迁移详细事实，再把顶层 03 收敛为派生摘要和链接，不能保留两份可写状态。",
+      "files": [],
+      "assertions": ["模块升级只改变承载位置。", "编号与历史语义保持稳定。", "拆分后没有双写详细事实。"]
+    },
+    {
+      "id": 18,
+      "name": "shared-business-capability-not-code-utility",
+      "prompt": "订单、用户和报表都依赖同一套权限校验和操作结果通知；Target 也有 Button、formatDate、useDebounce 等共享代码。",
+      "expected_output": "把可独立验证的权限校验、跨模块通知等业务能力放入 modules/shared/01-公共功能点.md，由业务模块引用公共功能编号；Button、formatDate、Hook 等纯工程基础设施不能因为共享代码就登记成公共功能。",
+      "files": [],
+      "assertions": ["公共模块承载公共业务能力而非普通共享代码。", "公共功能状态只维护一处。", "业务模块通过编号引用公共能力。"]
+    },
+    {
+      "id": 19,
+      "name": "chinese-canonical-enums",
+      "prompt": "迁移工作区里有人写了 almost-done、pending-check、差不多完成、ready-ish 等自定义状态，并准备新增 state.json 作为机器状态源。",
+      "expected_output": "统一回中文规范枚举，例如未开始、开发中、待验证、验证中、验证失败、已完成等；schema 只约束 Markdown 权威事实的字段和值，不新增 JSON/YAML 第二事实源。",
+      "files": [],
+      "assertions": ["状态和枚举优先使用中文规范值。", "不允许随意创造近义状态。", "canonical schema 不制造第二事实源。"]
+    },
+    {
+      "id": 20,
+      "name": "deterministic-atomic-state-convergence",
+      "prompt": "某原子功能项实施状态=已实施、验证状态=未验证、阻塞状态=未阻塞，但当前状态手工写成了已完成。另一个项验证状态=失败却写成待验证。",
+      "expected_output": "按详细字段重新收敛：已实施+未验证应为待验证，验证失败应为验证失败；当前状态不能反向覆盖实施/验证事实。",
+      "files": [],
+      "assertions": ["原子功能项状态按确定优先级派生。", "详细权威事实优先于手工当前状态。", "验证失败不会被待验证或已完成覆盖。"]
+    },
+    {
+      "id": 21,
+      "name": "workspace-projection-convergence",
+      "prompt": "modules/M-001-订单中心/01 中退款 I03 验证失败；模块 00 把退款勾成 [x]，顶层 03 又把订单模块写成已完成，09 的 Batch 也写了已完成。",
+      "expected_output": "从模块 01 的详细事实开始重新收敛：I03=验证失败，退款功能不能已迁移，订单模块不能已完成，再依次修正模块 00、顶层 03、顶层 00/09 相关摘要和 Checkbox；不能修改真实失败来迎合上层视图。",
+      "files": [],
+      "assertions": ["冲突从详细事实向上修复。", "09/Checkbox 不是完成事实源。", "上层派生视图不得反向覆盖下层失败。"]
+    },
+    {
+      "id": 22,
+      "name": "dependency-blocks-feature-completion",
+      "prompt": "订单导出自身全部原子功能项都已验证通过，但它依赖公共-PERM-001 权限校验；公共权限功能仍验证失败。Agent 想把订单导出标记为已迁移。",
+      "expected_output": "订单导出可以保留自身原子功能项已完成事实，但公共依赖未满足会阻断功能跨过完成门，因此功能不能收敛为已迁移；业务模块只引用公共功能编号，不复制公共权限内部状态表。",
+      "files": [],
+      "assertions": ["前置依赖可阻断功能完成。", "自身完成不等于依赖完成。", "公共依赖状态仍只维护在公共模块。"]
     }
   ]
 }
