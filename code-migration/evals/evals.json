@@ -8,15 +8,15 @@
       "prompt": "把 admin-a 和 admin-b 的订单中心迁入 target-console。两边订单状态、退款规则和权限不同，目标项目已有 Router、Query、权限和组件库。退款采用新产品规则。",
       "expected_output": "先恢复多源真实行为并归一化，再确定目标期望行为和功能台账；冲突显式决策，目标实现复用现有能力。",
       "files": [],
-      "assertions": ["先建立统一功能/领域模型，而不是分别搬运两个源项目。", "区分源证据、目标期望行为和目标原生实现。", "退款新规则作为已批准变化验证，不被修回任一旧实现。"]
+      "assertions": ["先建立统一功能/领域模型，而不是分别搬运两个源项目。", "区分源证据、目标期望行为和目标原生实现。", "退款新规则作为已批准变化验证。"]
     },
     {
       "id": 2,
       "name": "layout-first-dashboard-migration",
-      "prompt": "把旧 dashboard 迁到新后台。新后台导航、内容宽度和 Design System 都不同，希望先搭当前页面必要布局，再逐块做 Overview、Recent Orders、Alerts。",
-      "expected_output": "选择最小结构切片，再按完整功能能力推进，不一次铺开所有页面。",
+      "prompt": "把旧 dashboard 迁到新后台。旧页面桌面端是 Header + 左侧导航 + 主内容双栏，移动端会变成单栏；新后台导航和 Design System 不同，希望先搭必要布局，再逐块做功能。",
+      "expected_output": "中风险前端先恢复页面区域树、布局不变量和响应式变化，应用目标 Layout Pattern 后通过结构 Gate，再推进功能切片。",
       "files": [],
-      "assertions": ["布局优先只建立当前范围必要结构。", "每个工作流内保持单一主要实施焦点。", "功能进度按功能子项而不是文件数量衡量。"]
+      "assertions": ["不会只写‘先搭骨架’而缺少区域父子、单双栏、滚动和响应式语义。", "目标 Design System 可以改变实现方式，但不能静默破坏需要保持的布局不变量。", "结构切片验证通过后再铺开大量功能。"]
     },
     {
       "id": 3,
@@ -30,9 +30,9 @@
       "id": 4,
       "name": "representative-slice-before-scale",
       "prompt": "大型 AngularJS 客服系统迁到 Next.js，团队想先批量生成 40 个页面再集中修问题。",
-      "expected_output": "先做覆盖权限、SSR、数据和表单的代表性切片，验证迁移规则后再扩大。",
+      "expected_output": "先做代表性切片验证功能发现、目标架构、复杂交互和页面结构规则，再扩大。",
       "files": [],
-      "assertions": ["不会同时铺开大量未验证半成品。", "代表性切片用于验证目标架构和迁移模型。"]
+      "assertions": ["不会同时铺开大量未验证半成品。", "代表性切片用于验证迁移规则。"]
     },
     {
       "id": 5,
@@ -46,7 +46,7 @@
       "id": 6,
       "name": "codemod-boundary-semantic-change",
       "prompt": "300 个组件要改 import 和事件 API，其中 60 个还涉及权限、异步状态和新产品交互，希望尽量自动化。",
-      "expected_output": "机械变化可小批次自动化；权限、状态和产品交互必须进入语义设计。",
+      "expected_output": "机械变化可小批次自动化；权限、状态、交互和产品行为必须进入语义设计。",
       "files": [],
       "assertions": ["Codemod 不决定权限、状态所有权或产品行为。", "自动化先代表性验证再扩张。"]
     },
@@ -54,9 +54,9 @@
       "id": 7,
       "name": "resume-migration-from-workspace",
       "prompt": "这是新对话，目标仓库已有 `.code-migration/`，之前迁了一部分订单中心，请继续，不要重头分析。",
-      "expected_output": "先恢复状态总览、活跃工作流、用户规则、功能台账、源行为和输入基线，再核对 Git/代码。",
+      "expected_output": "恢复状态总览、用户新方案、功能来源、活跃工作流、07/08 状态和输入基线，再核对 Git/代码。",
       "files": [],
-      "assertions": ["状态总览是第一恢复入口。", "恢复生效用户规则和活跃工作流。", "核对真实 Git/代码状态。"]
+      "assertions": ["状态总览是第一恢复入口。", "复杂前端页面会恢复 08 的结构/交互契约。", "核对真实 Git/代码状态。"]
     },
     {
       "id": 8,
@@ -70,7 +70,7 @@
       "id": 9,
       "name": "session-handoff-and-reconcile",
       "prompt": "订单详情做到一半要结束对话，有未提交文件、测试只跑了一部分，迁移文档可能落后。",
-      "expected_output": "记录真实子项、代码和验证状态，无法确认一致时标记需要重新校准。",
+      "expected_output": "记录真实子项、发现/来源、07/08 验证和代码状态，无法确认一致时标记需要重新校准。",
       "files": [],
       "assertions": ["半完成代码不会标为已迁移。", "记录未提交工作和验证结果。"]
     },
@@ -94,15 +94,15 @@
       "id": 12,
       "name": "feature-item-ledger-prevents-false-completion",
       "prompt": "订单详情基础信息和支付信息已完成，但 403 权限仍在开发，移动端布局已实施但验证失败。",
-      "expected_output": "逐子项更新当前状态和详细状态；移动端布局显示验证失败，订单详情功能不能标为已迁移。",
+      "expected_output": "逐子项更新真实状态；移动端布局显示验证失败，订单详情不能标为已迁移。",
       "files": [],
-      "assertions": ["基础信息和支付信息当前状态为已完成。", "403 权限当前状态为开发中。", "移动端布局当前状态必须为验证失败，而不是验证中或已完成。", "存在验证失败的必需子项时功能不能已迁移。"]
+      "assertions": ["403 权限当前状态为开发中。", "移动端布局当前状态为验证失败。", "存在验证失败的必需子项时功能不能已迁移。"]
     },
     {
       "id": 13,
       "name": "required-user-tool-unavailable",
       "prompt": "用户规则规定所有页面 UI 回归必须使用 Playwright，但当前环境没有 Playwright 和浏览器连接。",
-      "expected_output": "不静默换工具；相关验证子项/工作流标为已阻塞，记录解除条件并请求用户选择启用、替代、改规则或延后。",
+      "expected_output": "不静默换工具；相关验证子项/工作流标为已阻塞，记录解除条件并请求用户选择。",
       "files": [],
       "assertions": ["必须工具不可用时不会静默替换。", "阻塞原因和解除条件被持久化。"]
     },
@@ -110,49 +110,81 @@
       "id": 14,
       "name": "source-behavior-coverage-before-implementation",
       "prompt": "订单详情文档只写了‘查看订单信息’，但 Source 实际还有返回列表保留筛选、403 独立错误态、已取消订单隐藏退款按钮、金额两位小数。开发 Agent 准备直接开始写页面。",
-      "expected_output": "按风险补源行为契约和稳定行为 ID，映射到功能子项；源行为覆盖检查通过后才进入实施。",
+      "expected_output": "先执行功能发现和关键源行为覆盖，再映射功能子项；覆盖不足时不直接进入中高风险实施。",
       "files": [],
-      "assertions": ["不会只凭粗粒度功能描述直接进入中高风险实施。", "所有关键保持行为都有功能子项映射。", "07 不重复维护功能子项实施状态。"]
+      "assertions": ["不会只凭粗粒度功能描述直接实施。", "关键保持行为都有功能子项映射。", "会检查权限、错误、导航和字段格式。"]
     },
     {
       "id": 15,
       "name": "controlled-parallel-workstreams-and-integration",
-      "prompt": "Dashboard Alerts、User Settings、Order Export 分属不同模块且不共享 Route、Store、API contract 或公共组件，希望多个 Agent 同时开发。另一个 Refund Drawer 会改 Order Detail 共用状态/API。并且开发期间源分析 Agent 更新了 Order Export 的一个关键行为。",
-      "expected_output": "独立功能可建立多个工作流；共享状态/API 功能不直接并行。关键行为变化触发输入基线检查，强制条件命中时执行集成验证。",
+      "prompt": "Dashboard Alerts、User Settings、Order Export 分属不同模块且不共享 Route、Store、API contract 或公共组件，希望多个 Agent 同时开发。另一个 Refund Drawer 会改 Order Detail 共用状态/API。",
+      "expected_output": "独立功能可建立多个工作流；共享状态/API 功能不直接并行。环境不支持隔离时安全串行降级，命中共享边界时执行集成验证。",
       "files": [],
-      "assertions": ["独立功能允许多个实施 Agent 同时开发。", "共享状态/API 的功能不直接并行。", "如果环境不支持子 Agent 或安全隔离，不伪造并行而是串行降级。", "共享 API/状态或同一发布批次会强制触发集成验证。"]
+      "assertions": ["独立功能允许并行。", "共享状态/API 的功能不直接并行。", "不能安全隔离时不伪造并行。", "共享 API/状态会触发集成验证。"]
     },
     {
       "id": 16,
       "name": "chinese-decisions-and-explicit-subitem-status",
-      "prompt": "生成订单中心的迁移功能点清单和源行为对齐清单。订单列表未开始，订单详情正在开发，导出功能已实现但还没验证，退款权限验证中，旧版批量删除明确不迁移。",
-      "expected_output": "02 和 07 使用中文字段、中文决策和显式状态。",
+      "prompt": "生成订单中心迁移功能点清单。订单列表未开始，订单详情正在开发，导出已实现待验证，退款权限验证中，旧版批量删除不迁移。",
+      "expected_output": "使用中文字段、中文决策和显式状态。",
       "files": [],
-      "assertions": ["02 的功能子项有当前状态列。", "07 的每条源行为有当前状态列。", "运行时迁移决策只使用中文值。", "不会生成英文迁移决策枚举。"]
+      "assertions": ["02 功能子项有当前状态。", "运行时迁移决策使用中文值。"]
     },
     {
       "id": 17,
       "name": "reuse-target-does-not-fake-implementation",
-      "prompt": "目标仓库已经有成熟 PermissionDialog，完全满足迁移功能。这个子项迁移决策是复用目标，没有任何生产代码需要改，只需要确认权限和错误行为。请更新状态。",
-      "expected_output": "处理方式使用复用已有，实施状态可为不适用；直接进入验证，通过后当前状态为已完成。",
+      "prompt": "目标仓库已经有成熟 PermissionDialog，完全满足迁移功能。没有生产代码需要改，只需要确认权限和错误行为。",
+      "expected_output": "处理方式使用复用已有，实施状态可为不适用；验证通过后完成。",
       "files": [],
-      "assertions": ["不会为了完成 Gate 把实施状态伪造成已实施。", "迁移决策=复用目标时处理方式可以是复用已有。", "复用已有仍必须验证目标行为。"]
+      "assertions": ["不会伪造成已实施。", "复用已有仍必须验证目标行为。"]
     },
     {
       "id": 18,
       "name": "behavior-ledger-authority-boundary",
       "prompt": "订单详情功能子项代码已经在 02 标为已实施。现在更新 07 的返回筛选源行为验证结果。",
-      "expected_output": "07 引用关联功能子项，不再次维护实施状态；只更新源行为当前状态、验证状态、目标实际表现和验证证据。",
+      "expected_output": "07 不再次维护实施状态，只更新源行为验证和目标实际表现。",
       "files": [],
-      "assertions": ["02 是功能子项实施状态权威源。", "07 不复制功能子项实施状态。", "07 是源行为验证和目标实际表现的权威源。"]
+      "assertions": ["02 是功能子项实施状态权威源。", "07 不复制功能子项实施状态。"]
     },
     {
       "id": 19,
       "name": "risk-adaptive-governance",
-      "prompt": "同时有三个迁移：A 是一个纯文案和静态展示的小组件；B 是订单详情，涉及权限、错误、导航和数据；C 是退款状态机，会影响真实资金并计划多个 Agent 并行。请规划迁移。",
-      "expected_output": "A=低风险采用精简治理，B=中风险维护关键源行为和子项验证，C=高风险使用完整源行为契约、输入基线、独立验证、并行安全和集成验证。",
+      "prompt": "A 是纯文案小组件；B 是订单详情，涉及权限、错误、导航和复杂交互；C 是退款状态机，影响真实资金并计划多 Agent。",
+      "expected_output": "A 使用低风险精简治理，B 使用中风险发现/行为/交互治理，C 使用高风险完整治理。",
       "files": [],
-      "assertions": ["低风险任务不会被强制创建完整 07、输入基线和多 Agent 流程。", "中风险任务要求关键源行为覆盖和子项验证。", "高风险任务使用完整治理。", "风险升级时会补齐更高等级要求。"]
+      "assertions": ["低风险不强制完整 07/08。", "中风险要求功能发现和关键交互/结构检查。", "高风险使用完整治理。"]
+    },
+    {
+      "id": 20,
+      "name": "deep-feature-discovery-forward-and-reverse",
+      "prompt": "迁移订单详情。页面上只看到查看、退款、改地址，但代码还有轮询订单状态、409 恢复、管理员内部备注、Risk Flag 审核、返回列表恢复筛选和退款后刷新 Timeline。",
+      "expected_output": "在实施前建立功能触点图，正向从入口追踪并反向从 API/状态/Event/测试查调用方，把条件能力、自动行为、异常恢复和副作用纳入发现覆盖。",
+      "files": [],
+      "assertions": ["不会只根据首屏可见按钮盘点功能。", "会检查权限/Flag/状态分支。", "会检查轮询、缓存/刷新、副作用。", "会利用测试和反向调用发现深层逻辑。", "发现覆盖不足时不能声称范围完整。"]
+    },
+    {
+      "id": 21,
+      "name": "prevent-hallucinated-feature-additions",
+      "prompt": "Source 订单列表没有导出、收藏视图和批量操作，用户也没要求新增。目标仓库恰好有 ExportButton、SavedView 和 BulkAction 组件。Agent 认为这些体验很好，准备一起加上。",
+      "expected_output": "这些只能作为推断候选/设计建议，不能进入范围内必需项；目标组件存在不能证明产品需要。任何新增必须有用户、产品、目标强制约束或已确认 Decision 依据。",
+      "files": [],
+      "assertions": ["不会因为目标项目有组件就自动新增功能。", "不会把行业惯例或 Agent 建议当作 Source 事实。", "正式功能子项必须记录来源类型和依据。", "无合法依据的新增不能进入必需范围。"]
+    },
+    {
+      "id": 22,
+      "name": "interaction-semantics-fidelity",
+      "prompt": "Source 删除订单不是直接调用 API：点击删除后打开确认弹窗，输入 DELETE 才能提交；提交时禁止重复点击；409 不关闭弹窗并保留输入；成功后 Toast、关闭弹窗、局部刷新列表且保持当前分页。",
+      "expected_output": "建立交互语义契约，明确前置条件、触发、即时反馈、中间状态、成功/失败、恢复、副作用和收尾；不能简化成‘点击删除调用 API’。",
+      "files": [],
+      "assertions": ["保留二次确认和输入要求。", "提交中禁止重复提交。", "409 保留输入且不关闭。", "成功后的 Toast/关闭/局部刷新/分页保持都进入交互验证。"]
+    },
+    {
+      "id": 23,
+      "name": "user-new-layout-and-interaction-plan",
+      "prompt": "Source 订单详情桌面是左右双栏，点击客户跳独立详情页。用户明确要求 Target 改成 Overview/Payment/Timeline Tabs，客户信息改右侧 Drawer，桌面 Drawer 420px，移动端全屏。不要照搬旧布局。",
+      "expected_output": "把 Source 双栏/跳页作为证据，把用户新方案记录为‘按新方案重构’，建立目标区域树、Drawer 响应式和交互契约，并按新方案验证，而不是拿 Source 差异当回归。",
+      "files": [],
+      "assertions": ["用户新布局/交互方案优先于 Source 旧形态。", "会建立目标页面区域树而不是复制 Source 双栏。", "会记录 Drawer 桌面宽度和移动端全屏变化。", "验证面向 Tabs+Drawer 新方案。", "不会把和 Source 不同误判为需要修复。"]
     }
   ]
 }
