@@ -8,17 +8,13 @@ CLM v0.2 是语言无关的 **带类型语义模型**。目标是让业务行为
 统一 Node Registry
 Typed Value / Typed Expression AST
 Symbol Table
-Typed Action
+Typed Action / Decision / Foreach
 Typed Scenario
 Semantic Patch / Change Set
 Semantic Hash
 ```
 
-机器公共实现以：
-
-`scripts/lib/model.mjs`
-
-为统一 Node Registry、Symbol Table 和 Semantic Hash 基础。禁止各工具维护另一份节点集合。
+机器公共实现以 `scripts/lib/model.mjs` 为统一 Node Registry、Symbol Table、Semantic Hash 和 scoped-ref 解析基础。禁止各工具维护另一份节点集合或类型规则。
 
 ## 2. 节点集合
 
@@ -48,6 +44,9 @@ fields:
   - id: domain.order.status
     type: domain.order_status
     nullable: false
+  - id: domain.order.items
+    type: domain.order_item
+    cardinality: many
 ```
 
 Enum：
@@ -71,6 +70,8 @@ base_type: number
 ```
 
 Entity field 会进入 Symbol Table，不需要在 `domain` 顶层重复建节点。
+
+`cardinality: many` 表示字段是该类型的集合；它是 foreach typed collection 的类型依据。
 
 ## 4. Typed Value
 
@@ -104,29 +105,13 @@ null: true
 
 ```yaml
 set:
-  - enum:
-      type: domain.order_status
-      value: PENDING_PAYMENT
-  - enum:
-      type: domain.order_status
-      value: PENDING_ACCEPTANCE
+  - enum: { type: domain.order_status, value: PENDING_PAYMENT }
+  - enum: { type: domain.order_status, value: PENDING_ACCEPTANCE }
 ```
 
 Typed Value 必须且只能使用一种形态。
 
 ## 5. Typed Expression
-
-比较：
-
-```yaml
-op: eq
-left:
-  ref: domain.order.status
-right:
-  enum:
-    type: domain.order_status
-    value: PENDING_PAYMENT
-```
 
 标准操作：
 
@@ -135,7 +120,7 @@ eq ne lt le gt ge in not_in
 all any not
 ```
 
-集合判断：
+例如：
 
 ```yaml
 op: in
@@ -147,7 +132,7 @@ right:
     - enum: { type: domain.order_status, value: PENDING_ACCEPTANCE }
 ```
 
-`in / not_in` 右侧必须使用 typed `set`，不能退回自由字符串数组。
+`in / not_in` 右侧必须使用 typed `set`。
 
 ## 6. Rule
 
@@ -166,17 +151,19 @@ expression:
 ## 7. Decision
 
 ```yaml
-id: decision.order.cancel.refund
+id: decision.order.route
 kind: decision
 when:
   op: eq
-  left: { ref: domain.payment.status }
-  right:
-    enum: { type: domain.payment_status, value: SUCCEEDED }
+  left: { ref: domain.order.priority }
+  right: { literal: VIP }
 then:
-  - action.payment.create_refund
-else: []
+  - action.order.route.fast
+else:
+  - action.order.route.standard
 ```
+
+IIR 必须保持分支顺序和嵌套结构，不能把 then/else 扁平化成无条件执行。
 
 ## 8. Typed Action
 
@@ -194,7 +181,80 @@ value:
 
 赋值两侧必须通过类型检查。
 
-## 9. Typed Scenario
+## 9. Foreach 与局部作用域
+
+Foreach 使用现有 v0.2 字段，不引入新的序列化形状：
+
+```yaml
+id: action.order.foreach_reserved_items
+kind: foreach
+collection:
+  ref: domain.order.items
+item: item
+when:
+  op: eq
+  left: { ref: item.reserved }
+  right: { literal: true }
+do:
+  - action.order.release_item
+```
+
+子 Action：
+
+```yaml
+id: action.order.release_item
+kind: action
+operation: assign
+target: { ref: item.released }
+value: { literal: true }
+```
+
+### 9.1 Collection Gate
+
+`foreach.collection` 必须：
+
+1. 引用已存在 field；
+2. field `cardinality = many`；
+3. field `type` 指向 Entity。
+
+否则 `INVALID_FOREACH_COLLECTION`。
+
+### 9.2 Scoped Ref
+
+`item.xxx` 不是全局 Semantic ID，而是上下文型 scoped ref。
+
+```text
+foreach.item = item
+collection.type = domain.order_item
+item.released
+→ domain.order_item.released 的类型/字段语义
+```
+
+Scoped ref 只在：
+
+- foreach 自身 `when`；
+- foreach `do` 引用的子步骤；
+- 子 Decision 分支；
+
+范围内合法。
+
+离开该作用域后 `item.xxx` 必须重新判定为非法引用。
+
+同一 Action 被两个类型不同的 foreach 作为 `do` 节点复用时，报告 `FOREACH_SCOPE_CONFLICT`，不要让节点的局部类型依赖调用方碰巧成立。
+
+### 9.3 当前嵌套边界
+
+v0.2 当前支持单层 typed foreach。
+
+如果内层 foreach 的 `collection` 本身引用外层 scoped item，例如：
+
+```text
+item.children
+```
+
+当前进入 `blocking unresolved`。后续如果需要支持，应明确扩展 scoped collection resolution，不在 Generator 中临时猜测。
+
+## 10. Typed Scenario
 
 ```yaml
 id: scenario.order.cancel.pending
@@ -213,7 +273,9 @@ then:
 
 Scenario 是 executable example，不重新定义 CLM 规则。
 
-## 10. Constraint
+当前 Scenario assignment 主要覆盖标量字段；复杂集合对象 fixture 应通过后续结构化 fixture 协议扩展，不用自由 JSON 绕过类型系统。
+
+## 11. Constraint
 
 ```yaml
 id: invariant.order.refund_not_exceed_payment
@@ -224,25 +286,15 @@ expression:
   right: { ref: domain.order.paid_amount }
 ```
 
-## 11. Symbol Table
-
-生成：
+## 12. Symbol Table
 
 ```bash
 node scripts/logic_cli.mjs symbols model.json -o symbols.json
 ```
 
-用于：
+用于引用检查、enum、类型兼容、foreach item 类型、测试派生、中文投影、IIR 编译和后续 Formal Projection。
 
-- 引用检查；
-- enum value 检查；
-- 类型兼容；
-- 测试派生；
-- 中文投影；
-- IIR 编译；
-- 后续 Formal Projection。
-
-## 12. 校验
+## 13. 校验
 
 结构 Gate：
 
@@ -261,7 +313,8 @@ node scripts/logic_cli.mjs validate-clm model.json
 ```text
 Semantic ID 唯一
 Node collection 正确
-引用存在
+全局引用存在
+foreach scoped ref 不越界
 enum type/value 合法
 assign 类型兼容
 Scenario 类型兼容
@@ -269,7 +322,7 @@ Scenario 类型兼容
 observed evidence 满足要求
 ```
 
-## 13. v0.1 兼容
+## 14. v0.1 兼容
 
 v0.1 只保留兼容读取与迁移能力，不再扩展新功能。
 
@@ -279,7 +332,7 @@ node scripts/migrate_clm_v01_to_v02.mjs old.json -o new.json
 
 迁移脚本只做确定性结构转换，不猜测缺失业务含义。
 
-## 14. Canonical Gate
+## 15. Canonical Gate
 
 进入 canonical 前至少要求：
 
@@ -288,6 +341,7 @@ Schema valid
 Semantic valid
 所有关键引用可解析
 所有 Typed Expression 可检查
+foreach scope 可解析
 无关键状态冲突
 Legacy observed facts 有足够 Evidence
 ```
