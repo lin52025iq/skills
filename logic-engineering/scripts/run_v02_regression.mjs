@@ -17,7 +17,7 @@ checks.push(run('logic_cli.mjs',['symbols',model,'-o',path.join(tmp,'symbols.jso
 checks.push(run('logic_cli.mjs',['hash',model],'Semantic Hash'));
 checks.push(run('compile_iir.mjs',[model,profile,'-o',path.join(tmp,'iir.json')],'IIR v0.2 编译'));
 checks.push(run('schema_validate.mjs',[path.join(tmp,'iir.json'),path.join(SCHEMAS,'iir-v0.2.schema.json')],'IIR Schema'));
-checks.push(run('logic_cli.mjs',['validate-iir',path.join(tmp,'iir.json')],'IIR Semantic'));
+checks.push(run('validate_iir.mjs',[path.join(tmp,'iir.json')],'IIR Semantic'));
 checks.push(run('compile_target_tests.mjs',[path.join(tmp,'tests.json'),path.join(tmp,'iir.json'),'-o',path.join(tmp,'target-tests.json')],'Target Test Plan v0.2'));
 checks.push(run('generate_typescript_v02.mjs',[path.join(tmp,'iir.json'),path.join(tmp,'target-tests.json'),'-o',path.join(tmp,'generated-ts')],'TypeScript + SQLite v0.2 生成'));
 checks.push(run('logic_cli.mjs',['verify-manifest',path.join(tmp,'generated-ts')],'Manifest 漂移校验'));
@@ -38,7 +38,7 @@ checks.push(run('logic_cli.mjs',['validate-clm',decisionModel],'Decision CLM Sem
 checks.push(run('logic_cli.mjs',['test-vectors',decisionModel,'-o',path.join(decisionDir,'tests.json')],'Decision 测试向量'));
 checks.push(run('compile_iir.mjs',[decisionModel,profile,'-o',path.join(decisionDir,'iir.json')],'Decision IIR 编译'));
 checks.push(run('schema_validate.mjs',[path.join(decisionDir,'iir.json'),path.join(SCHEMAS,'iir-v0.2.schema.json')],'Decision IIR Schema'));
-checks.push(run('logic_cli.mjs',['validate-iir',path.join(decisionDir,'iir.json')],'Decision IIR Semantic'));
+checks.push(run('validate_iir.mjs',[path.join(decisionDir,'iir.json')],'Decision IIR Semantic'));
 checks.push(run('compile_target_tests.mjs',[path.join(decisionDir,'tests.json'),path.join(decisionDir,'iir.json'),'-o',path.join(decisionDir,'target-tests.json')],'Decision Target Test Plan'));
 checks.push(run('generate_typescript_v02.mjs',[path.join(decisionDir,'iir.json'),path.join(decisionDir,'target-tests.json'),'-o',path.join(decisionDir,'generated-ts')],'Decision TypeScript 生成'));
 checks.push(run('validate_generated_typescript.mjs',[path.join(decisionDir,'generated-ts')],'Decision TypeScript 质量'));
@@ -58,7 +58,7 @@ checks.push(run('logic_cli.mjs',['validate-clm',foreachModel],'Foreach CLM Seman
 checks.push(run('logic_cli.mjs',['test-vectors',foreachModel,'-o',path.join(foreachDir,'tests.json')],'Foreach 测试向量'));
 checks.push(run('compile_iir.mjs',[foreachModel,profile,'-o',path.join(foreachDir,'iir.json')],'Foreach IIR 编译'));
 checks.push(run('schema_validate.mjs',[path.join(foreachDir,'iir.json'),path.join(SCHEMAS,'iir-v0.2.schema.json')],'Foreach IIR Schema'));
-checks.push(run('logic_cli.mjs',['validate-iir',path.join(foreachDir,'iir.json')],'Foreach IIR Semantic'));
+checks.push(run('validate_iir.mjs',[path.join(foreachDir,'iir.json')],'Foreach IIR Semantic'));
 checks.push(run('compile_target_tests.mjs',[path.join(foreachDir,'tests.json'),path.join(foreachDir,'iir.json'),'-o',path.join(foreachDir,'target-tests.json')],'Foreach Target Test Plan'));
 checks.push(run('generate_typescript_v02.mjs',[path.join(foreachDir,'iir.json'),path.join(foreachDir,'target-tests.json'),'-o',path.join(foreachDir,'generated-ts')],'Foreach TypeScript 生成'));
 checks.push(run('validate_generated_typescript.mjs',[path.join(foreachDir,'generated-ts')],'Foreach TypeScript 质量'));
