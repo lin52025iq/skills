@@ -1,8 +1,8 @@
 # 语义变更集（Semantic Change Set）v0.2
 
-语义变更集用于表示一个完整业务修改包含多个 CLM 节点变化的情况。
+语义变更集表示一个完整业务修改包含多个 CLM 节点变化的情况。
 
-它解决的问题不是“批量修改方便”，而是保证：
+它保证：
 
 ```text
 一个业务意图
@@ -14,24 +14,19 @@
 
 ## 1. 什么时候使用
 
-单个 Semantic Patch 适合：
-
-- 修改一个 Rule 字段；
-- 增加一个枚举成员；
-- 调整一个节点状态；
-- 不会造成其他 CLM 节点必须同步变化的局部修改。
+单个 Semantic Patch 适合真正独立的单节点修改。
 
 Semantic Change Set 适合：
 
-- 修改规则并增加 Scenario；
+- 修改 Rule 并增加 Scenario；
 - 新增状态并增加 Transition；
 - 抽取公共 Rule 并替换多个引用；
 - 修改 Behavior 同时更新 Constraint；
-- 一个修改只有整体应用才保持 CLM 一致。
+- 任意只有整体应用才保持 CLM 一致的业务修改。
 
 ## 2. 原子性
 
-应用器必须在内存副本中执行所有操作。
+所有 operation 必须先在内存副本中执行。
 
 ```text
 operation 1 ✓
@@ -42,8 +37,6 @@ operation 3 ✗
 → 不写出部分更新后的 CLM
 ```
 
-禁止把前三个操作分别写入磁盘后再回滚。
-
 ## 3. 基本结构
 
 ```json
@@ -52,18 +45,15 @@ operation 3 ✗
   "intent": "允许已支付订单取消",
   "behavior_change_level": "O4_BUSINESS_CHANGE",
   "base_model_version": "0.2",
+  "base_semantic_hash": "<64位 sha256>",
   "operations": [],
   "verification_required": []
 }
 ```
 
-详细 Schema：
+Schema：`schemas/semantic-change-set-v0.2.schema.json`
 
-`schemas/semantic-change-set-v0.2.schema.json`
-
-## 4. 支持操作
-
-v0.2 第一版支持：
+## 4. 基础操作
 
 ```text
 ADD_NODE
@@ -76,47 +66,49 @@ REMOVE_RELATION
 REPLACE_REFERENCE
 ```
 
-复杂语义操作如：
-
-```text
-EXTRACT_COMMON_RULE
-INLINE_RULE
-RENAME_SYMBOL
-MOVE_NODE
-```
-
-后续应先展开成上述基础操作，再原子应用。
+高级操作如 `EXTRACT_COMMON_RULE / INLINE_RULE / RENAME_SYMBOL / MOVE_NODE` 应先规划为基础操作，再作为一个 Change Set 原子执行。
 
 ## 5. 应用顺序
 
-操作按 `operations` 数组顺序执行。
+操作按 `operations` 顺序执行。依赖新节点的引用更新必须晚于 `ADD_NODE`。
 
-如果后一个操作依赖前一个新建节点，应把 ADD_NODE 放在引用操作之前。
+## 6. 并发修改保护
 
-例如：
+Change Set 支持两层前置条件：
 
 ```text
-1. ADD_NODE rule.order.operation.authorization
-2. REPLACE_REFERENCE behavior.order.cancel old_rule → new_rule
-3. REPLACE_REFERENCE behavior.order.edit old_rule → new_rule
-4. REMOVE_NODE old_rule
+base_model_version
+base_semantic_hash
 ```
 
-## 6. 版本前置条件
+`base_model_version` 防止跨模型版本误应用。
 
-推荐提供：
+`base_semantic_hash` 防止同一个 v0.2 模型已经被其他修改改变后，旧 Change Set 仍继续应用。
 
-```json
-"base_model_version": "0.2"
+哈希通过：
+
+```bash
+python scripts/semantic_hash.py model.json
 ```
 
-版本不一致时拒绝应用，避免把旧变更集误套到已经变化的 CLM。
+计算。
 
-未来还应增加 semantic hash 前置条件。
+当前 semantic hash 默认排除证据、置信度和 notes 等不会改变执行语义的元数据。
+
+任一前置条件不匹配，必须拒绝整个 Change Set。
+
+应用成功后的 diff 同时记录：
+
+```text
+base_semantic_hash
+result_semantic_hash
+```
+
+从而形成明确的语义版本链。
 
 ## 7. 变更等级
 
-整个 Change Set 必须声明最高变化等级：
+整个 Change Set 声明内部最高变化等级：
 
 ```text
 O1_NORMALIZATION
@@ -125,13 +117,11 @@ O3_ROBUSTNESS
 O4_BUSINESS_CHANGE
 ```
 
-如果内部任何 operation 会改变业务行为，则整个 Change Set 至少是 O4。
-
-不要通过拆分操作降低变化等级。
+内部任何 operation 改变业务行为时，Change Set 至少是 O4。
 
 ## 8. 验证要求
 
-Change Set 必须显式保存验证要求，例如：
+必须显式保存本次变化需要的验证，例如：
 
 ```json
 [
@@ -143,23 +133,24 @@ Change Set 必须显式保存验证要求，例如：
 ]
 ```
 
-应用完成后仍必须重新运行 CLM Validator。
+Change Set 应用完成后必须重新执行 Validator、影响分析及相应测试生成。
 
 ## 9. 影响分析
 
-Change Set 应汇总所有变化 Semantic ID，然后统一运行：
+汇总全部 `changed_semantic_ids` 后统一传播，不允许只分析第一项修改。
+
+统一流水线：
 
 ```bash
-python scripts/analyze_impact.py updated.json <changed-id...>
+python scripts/run_logic_pipeline.py model.json \
+  --change-set change.json
 ```
 
-不要只分析第一个 operation。
+会自动完成应用、重新校验、影响分析、中文投影和测试向量生成。
 
 ## 10. 人类展示
 
-给用户展示时不要逐条暴露 JSON 操作。
-
-优先展示：
+默认展示业务变化，不展示低层 JSON operation：
 
 ```text
 修改：允许已支付订单取消
@@ -174,18 +165,24 @@ python scripts/analyze_impact.py updated.json <changed-id...>
 - 取消订单行为
 - 相关测试
 - 目标实现
-
-验证要求：
-- 业务确认
-- 场景测试
 ```
 
-需要审计时再展开底层 operation。
+需要审计时才展开 operation、semantic hash 和完整 diff。
 
-## 11. 禁止事项
+## 11. 与 CLM v0.2 冻结的关系
 
-- 不把多个互相依赖的 Patch 当作独立提交静默执行。
+Change Set 属于 CLM v0.2 的核心写入协议。
+
+冻结 Gate 见：
+
+`references/clm-v0.2-freeze-checklist.md`
+
+只要后续存在破坏 Change Set 原子性、哈希保护或 Semantic ID 稳定性的改动，就必须视为 CLM 协议破坏性变化。
+
+## 12. 禁止事项
+
+- 不把互相依赖的多个 Patch 当作独立业务提交。
 - 不在部分操作失败后保留部分 CLM 修改。
-- 不在 Change Set 中直接写目标语言代码。
-- 不把 `behavior_change_level` 当装饰字段。
+- 不绕过 semantic hash 冲突继续强制应用旧 Change Set。
+- 不在 Change Set 中写目标语言代码。
 - 不跳过应用后的 CLM 校验和影响分析。
