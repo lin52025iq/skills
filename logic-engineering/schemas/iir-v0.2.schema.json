@@ -7,139 +7,16 @@
   "properties": { "iir": { "$ref": "#/$defs/root" } },
   "additionalProperties": false,
   "$defs": {
-    "unresolved": {
-      "type": "object",
-      "required": ["semantic_ref", "reason", "severity"],
-      "properties": {
-        "semantic_ref": { "type": "string" },
-        "reason": { "type": "string" },
-        "required_for": { "type": ["string", "null"] },
-        "severity": { "enum": ["blocking", "warning"] }
-      },
-      "additionalProperties": false
-    },
-    "domainTypes": {
-      "type": "object",
-      "required": ["enums", "entities"],
-      "properties": {
-        "enums": { "type": "array" },
-        "entities": { "type": "array" }
-      },
-      "additionalProperties": false
-    },
-    "runtimeBinding": {
-      "type": "object",
-      "required": ["semantic_ref", "kind", "slot"],
-      "properties": {
-        "semantic_ref": { "type": "string" },
-        "kind": { "enum": ["entity", "field"] },
-        "slot": { "type": "string" },
-        "entity_ref": { "type": "string" },
-        "path": { "type": "array", "items": { "type": "string" } }
-      },
-      "additionalProperties": false
-    },
-    "useCase": {
-      "type": "object",
-      "required": ["id", "kind", "semantic_refs", "guards", "steps", "dependencies"],
-      "properties": {
-        "id": { "type": "string" },
-        "kind": { "const": "use_case" },
-        "semantic_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-        "name": { "type": "string" },
-        "input_refs": { "type": "array", "items": { "type": "string" } },
-        "inputs": { "type": "array" },
-        "guards": { "type": "array" },
-        "steps": { "type": "array" },
-        "outputs": { "type": "array" },
-        "failure_refs": { "type": "array", "items": { "type": "string" } },
-        "postconditions": { "type": "array", "items": { "type": "string" } },
-        "dependencies": { "type": "array", "items": { "type": "string" } }
-      },
-      "additionalProperties": true
-    },
-    "repositoryContract": {
-      "type": "object",
-      "required": ["id", "kind", "entity_ref", "operations"],
-      "properties": {
-        "id": { "type": "string" },
-        "kind": { "const": "repository_contract" },
-        "entity_ref": { "type": "string" },
-        "semantic_refs": { "type": "array", "items": { "type": "string" } },
-        "operations": { "type": "array" },
-        "binding": { "type": "object" }
-      },
-      "additionalProperties": true
-    },
-    "externalPort": {
-      "type": "object",
-      "required": ["id", "kind", "system", "operations", "generation_mode"],
-      "properties": {
-        "id": { "type": "string" },
-        "kind": { "const": "external_port" },
-        "system": { "type": "string" },
-        "semantic_refs": { "type": "array", "items": { "type": "string" } },
-        "operations": { "type": "array" },
-        "generation_mode": { "enum": ["contract_only", "handwritten", "verified_binding"] }
-      },
-      "additionalProperties": true
-    },
-    "plan": {
-      "type": "object",
-      "required": ["id", "kind", "semantic_refs"],
-      "properties": {
-        "id": { "type": "string" },
-        "kind": { "type": "string" },
-        "semantic_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
-      },
-      "additionalProperties": true
-    },
-    "errorMapping": {
-      "type": "object",
-      "required": ["id", "semantic_error_ref", "target_error"],
-      "properties": {
-        "id": { "type": "string" },
-        "semantic_error_ref": { "type": "string" },
-        "target_error": { "type": "string" },
-        "transport": { "type": "object" }
-      },
-      "additionalProperties": true
-    },
-    "generationRegion": {
-      "type": "object",
-      "required": ["id", "mode", "semantic_refs"],
-      "properties": {
-        "id": { "type": "string" },
-        "mode": { "enum": ["generated", "contract_only", "handwritten", "verified_binding"] },
-        "semantic_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
-      },
-      "additionalProperties": false
-    },
-    "root": {
-      "type": "object",
-      "required": ["version", "source_clm_id", "source_clm_version", "target_profile", "domain_types", "runtime_bindings", "use_cases", "repository_contracts", "external_ports", "transaction_plans", "concurrency_plans", "retry_plans", "idempotency_plans", "error_mappings", "primitive_bindings", "generation_regions", "traceability", "unresolved"],
-      "properties": {
-        "version": { "const": "0.2" },
-        "source_clm_id": { "type": "string" },
-        "source_clm_version": { "type": ["string", "integer"] },
-        "source_semantic_hash": { "type": ["string", "null"] },
-        "target_profile": { "type": "object" },
-        "domain_types": { "$ref": "#/$defs/domainTypes" },
-        "runtime_bindings": { "type": "array", "items": { "$ref": "#/$defs/runtimeBinding" } },
-        "use_cases": { "type": "array", "items": { "$ref": "#/$defs/useCase" } },
-        "repository_contracts": { "type": "array", "items": { "$ref": "#/$defs/repositoryContract" } },
-        "external_ports": { "type": "array", "items": { "$ref": "#/$defs/externalPort" } },
-        "transaction_plans": { "type": "array", "items": { "$ref": "#/$defs/plan" } },
-        "concurrency_plans": { "type": "array", "items": { "$ref": "#/$defs/plan" } },
-        "retry_plans": { "type": "array", "items": { "$ref": "#/$defs/plan" } },
-        "idempotency_plans": { "type": "array", "items": { "$ref": "#/$defs/plan" } },
-        "error_mappings": { "type": "array", "items": { "$ref": "#/$defs/errorMapping" } },
-        "primitive_bindings": { "type": "array" },
-        "generation_regions": { "type": "array", "items": { "$ref": "#/$defs/generationRegion" } },
-        "traceability": { "type": "array" },
-        "unresolved": { "type": "array", "items": { "$ref": "#/$defs/unresolved" } }
-      },
-      "additionalProperties": false
-    }
+    "unresolved": {"type":"object","required":["semantic_ref","reason","severity"],"properties":{"semantic_ref":{"type":"string"},"reason":{"type":"string"},"required_for":{"type":["string","null"]},"severity":{"enum":["blocking","warning"]}},"additionalProperties":false},
+    "domainTypes": {"type":"object","required":["enums","entities"],"properties":{"enums":{"type":"array"},"entities":{"type":"array"}},"additionalProperties":false},
+    "runtimeBinding": {"type":"object","required":["semantic_ref","kind","slot"],"properties":{"semantic_ref":{"type":"string"},"kind":{"enum":["entity","field"]},"slot":{"type":"string"},"entity_ref":{"type":"string"},"path":{"type":"array","items":{"type":"string"}},"type_ref":{"type":"string"},"cardinality":{"enum":["one","many"]},"nullable":{"type":"boolean"}},"additionalProperties":true},
+    "useCase": {"type":"object","required":["id","kind","semantic_refs","guards","steps","dependencies","transaction_plan_ids"],"properties":{"id":{"type":"string"},"kind":{"const":"use_case"},"semantic_refs":{"type":"array","items":{"type":"string"},"minItems":1},"name":{"type":"string"},"display_name":{"type":["string","null"]},"input_refs":{"type":"array","items":{"type":"string"}},"inputs":{"type":"array"},"guards":{"type":"array"},"steps":{"type":"array"},"outputs":{"type":"array"},"failure_refs":{"type":"array","items":{"type":"string"}},"postconditions":{"type":"array","items":{"type":"string"}},"dependencies":{"type":"array","items":{"type":"string"}},"transaction_plan_ids":{"type":"array","items":{"type":"string"}}},"additionalProperties":true},
+    "repositoryContract": {"type":"object","required":["id","kind","entity_ref","operations"],"properties":{"id":{"type":"string"},"kind":{"const":"repository_contract"},"entity_ref":{"type":"string"},"semantic_refs":{"type":"array","items":{"type":"string"}},"operations":{"type":"array"},"binding":{"type":"object"}},"additionalProperties":true},
+    "externalPort": {"type":"object","required":["id","kind","system","operations","generation_mode"],"properties":{"id":{"type":"string"},"kind":{"const":"external_port"},"system":{"type":"string"},"semantic_refs":{"type":"array","items":{"type":"string"}},"operations":{"type":"array"},"generation_mode":{"enum":["contract_only","handwritten","verified_binding"]}},"additionalProperties":true},
+    "transactionPlan": {"type":"object","required":["id","kind","semantic_refs","behavior_ref","members","strategy","provider","boundary_valid"],"properties":{"id":{"type":"string"},"kind":{"const":"transaction_plan"},"semantic_refs":{"type":"array","items":{"type":"string"},"minItems":1},"behavior_ref":{"type":"string"},"members":{"type":"array","items":{"type":"string"},"minItems":1},"strategy":{"type":["string","null"]},"provider":{"type":["string","null"]},"start_index":{"type":["integer","null"]},"end_index":{"type":["integer","null"]},"boundary_valid":{"type":"boolean"}},"additionalProperties":false},
+    "plan": {"type":"object","required":["id","kind","semantic_refs"],"properties":{"id":{"type":"string"},"kind":{"type":"string"},"semantic_refs":{"type":"array","items":{"type":"string"},"minItems":1}},"additionalProperties":true},
+    "errorMapping": {"type":"object","required":["id","semantic_error_ref","target_error"],"properties":{"id":{"type":"string"},"semantic_error_ref":{"type":"string"},"target_error":{"type":"string"},"transport":{"type":"object"}},"additionalProperties":true},
+    "generationRegion": {"type":"object","required":["id","mode","semantic_refs"],"properties":{"id":{"type":"string"},"mode":{"enum":["generated","contract_only","handwritten","verified_binding"]},"semantic_refs":{"type":"array","items":{"type":"string"},"minItems":1}},"additionalProperties":false},
+    "root": {"type":"object","required":["version","source_clm_id","source_clm_version","target_profile","domain_types","runtime_bindings","use_cases","repository_contracts","external_ports","transaction_plans","concurrency_plans","retry_plans","idempotency_plans","error_mappings","primitive_bindings","generation_regions","traceability","unresolved"],"properties":{"version":{"const":"0.2"},"source_clm_id":{"type":"string"},"source_clm_version":{"type":["string","integer"]},"source_semantic_hash":{"type":["string","null"]},"target_profile":{"type":"object"},"domain_types":{"$ref":"#/$defs/domainTypes"},"runtime_bindings":{"type":"array","items":{"$ref":"#/$defs/runtimeBinding"}},"use_cases":{"type":"array","items":{"$ref":"#/$defs/useCase"}},"repository_contracts":{"type":"array","items":{"$ref":"#/$defs/repositoryContract"}},"external_ports":{"type":"array","items":{"$ref":"#/$defs/externalPort"}},"transaction_plans":{"type":"array","items":{"$ref":"#/$defs/transactionPlan"}},"concurrency_plans":{"type":"array","items":{"$ref":"#/$defs/plan"}},"retry_plans":{"type":"array","items":{"$ref":"#/$defs/plan"}},"idempotency_plans":{"type":"array","items":{"$ref":"#/$defs/plan"}},"error_mappings":{"type":"array","items":{"$ref":"#/$defs/errorMapping"}},"primitive_bindings":{"type":"array"},"generation_regions":{"type":"array","items":{"$ref":"#/$defs/generationRegion"}},"traceability":{"type":"array"},"unresolved":{"type":"array","items":{"$ref":"#/$defs/unresolved"}}},"additionalProperties":false}
   }
 }
