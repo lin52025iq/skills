@@ -5,7 +5,14 @@ function pascal(value){return String(value??'Generated').split(/[^A-Za-z0-9]+/).
 function camel(value){const p=pascal(value);return p[0].toLowerCase()+p.slice(1);}
 function entityOfField(ref){const parts=String(ref).split('.');return parts.length>=3?parts.slice(0,2).join('.'):null;}
 function collectRefs(v,out=new Set()){if(Array.isArray(v))for(const x of v)collectRefs(x,out);else if(v&&typeof v==='object'){if(typeof v.ref==='string')out.add(v.ref);for(const x of Object.values(v))collectRefs(x,out);}return out;}
-function collectGlobalRefs(v,symbols,scope,out=new Set()){if(Array.isArray(v)){for(const x of v)collectGlobalRefs(x,symbols,scope,out);return out;}if(v&&typeof v==='object'){if(typeof v.ref==='string'&&!resolveScopedRef(v.ref,scope,symbols))out.add(v.ref);for(const x of Object.values(v))collectGlobalRefs(x,symbols,scope,out);}return out;}
+function collectGlobalRefs(v,symbols,scope,out=new Set()){
+  if(Array.isArray(v)){for(const x of v)collectGlobalRefs(x,symbols,scope,out);return out;}
+  if(v&&typeof v==='object'){
+    if(typeof v.ref==='string'&&!resolveScopedRef(v.ref,scope,symbols))out.add(v.ref);
+    for(const x of Object.values(v))collectGlobalRefs(x,symbols,scope,out);
+  }
+  return out;
+}
 function safeSqlIdentifier(value){return typeof value==='string'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(value);}
 
 function compileDomain(root){
@@ -64,12 +71,26 @@ function attachPersistenceMappings(repositories,profile,symbols,unresolved){
 }
 
 function compilePlans(root,profile,unresolved){
-  const transaction_plans=[],concurrency_plans=[],retry_plans=[],idempotency_plans=[];
+  const transaction_plans=[],concurrency_plans=[],retry_plans=[],idempotency_plans=[],behaviors=new Map((root.behaviors??[]).map(x=>[x.id,x]));
   for(const c of root.constraints??[]){
-    if(c.kind==='atomicity'){const strategy=profile.transaction_strategy??null;transaction_plans.push({id:`plan.${c.id}`,kind:'transaction_plan',semantic_refs:[c.id],members:c.actions??c.members??[],strategy,provider:profile.persistence??null});if(!strategy)unresolved.push({semantic_ref:c.id,reason:'Target Profile 缺少 transaction_strategy',required_for:c.id,severity:'blocking'});}
-    else if(c.kind==='concurrency'){const strategy=profile.concurrency_strategy??null;concurrency_plans.push({id:`plan.${c.id}`,kind:'concurrency_plan',semantic_refs:[c.id],resource_ref:c.resource??null,scope:c.scope??null,strategy});if(!strategy)unresolved.push({semantic_ref:c.id,reason:'Target Profile 缺少 concurrency_strategy',required_for:c.id,severity:'blocking'});}
-    else if(c.kind==='idempotency'){const strategy=profile.idempotency_strategy??c.strategy??null;idempotency_plans.push({id:`plan.${c.id}`,kind:'idempotency_plan',semantic_refs:[c.id],operation_ref:c.operation??null,key_ref:c.key??null,strategy});if(!strategy)unresolved.push({semantic_ref:c.id,reason:'缺少幂等实现策略',required_for:c.id,severity:'blocking'});}
-    else if(c.kind==='retry'){const strategy=profile.retry_strategy??c.strategy??null;retry_plans.push({id:`plan.${c.id}`,kind:'retry_plan',semantic_refs:[c.id],operation_ref:c.operation??null,strategy,max_attempts:c.max_attempts??null});if(!strategy)unresolved.push({semantic_ref:c.id,reason:'缺少重试实现策略',required_for:c.id,severity:'blocking'});}
+    if(c.kind==='atomicity'){
+      const strategy=profile.transaction_strategy??null,behavior=behaviors.get(c.behavior_ref),members=[...(c.members??[])];
+      let start_index=null,end_index=null,boundary_valid=true;
+      if(!behavior){unresolved.push({semantic_ref:c.id,reason:`atomicity.behavior_ref 不存在或不是 Behavior: ${c.behavior_ref??'<missing>'}`,required_for:c.id,severity:'blocking'});boundary_valid=false;}
+      else{
+        const flow=behavior.flow??[],positions=members.map(x=>flow.indexOf(x));
+        if(!members.length||positions.some(x=>x<0)){unresolved.push({semantic_ref:c.id,reason:'atomicity.members 必须全部属于 behavior 顶层 flow',required_for:c.behavior_ref,severity:'blocking'});boundary_valid=false;}
+        else{start_index=Math.min(...positions);end_index=Math.max(...positions);const expected=flow.slice(start_index,end_index+1);if(expected.length!==members.length||expected.some((x,i)=>x!==members[i])){unresolved.push({semantic_ref:c.id,reason:'atomicity.members 必须按 behavior flow 顺序形成连续区间',required_for:c.behavior_ref,severity:'blocking'});boundary_valid=false;}}
+      }
+      transaction_plans.push({id:`plan.${c.id}`,kind:'transaction_plan',semantic_refs:[c.id],behavior_ref:c.behavior_ref??null,members,strategy,provider:profile.persistence??null,start_index,end_index,boundary_valid});
+      if(!strategy)unresolved.push({semantic_ref:c.id,reason:'Target Profile 缺少 transaction_strategy',required_for:c.id,severity:'blocking'});
+    }else if(c.kind==='concurrency'){
+      const strategy=profile.concurrency_strategy??null;concurrency_plans.push({id:`plan.${c.id}`,kind:'concurrency_plan',semantic_refs:[c.id],resource_ref:c.resource??null,scope:c.scope??null,strategy});if(!strategy)unresolved.push({semantic_ref:c.id,reason:'Target Profile 缺少 concurrency_strategy',required_for:c.id,severity:'blocking'});
+    }else if(c.kind==='idempotency'){
+      const strategy=profile.idempotency_strategy??c.strategy??null;idempotency_plans.push({id:`plan.${c.id}`,kind:'idempotency_plan',semantic_refs:[c.id],operation_ref:c.operation??null,key_ref:c.key??null,strategy});if(!strategy)unresolved.push({semantic_ref:c.id,reason:'缺少幂等实现策略',required_for:c.id,severity:'blocking'});
+    }else if(c.kind==='retry'){
+      const strategy=profile.retry_strategy??c.strategy??null;retry_plans.push({id:`plan.${c.id}`,kind:'retry_plan',semantic_refs:[c.id],operation_ref:c.operation??null,strategy,max_attempts:c.max_attempts??null});if(!strategy)unresolved.push({semantic_ref:c.id,reason:'缺少重试实现策略',required_for:c.id,severity:'blocking'});
+    }
   }
   return{transaction_plans,concurrency_plans,retry_plans,idempotency_plans};
 }
@@ -89,9 +110,12 @@ function compileStep(id,index,symbols,unresolved,owner,stack=new Set(),scope=nul
 }
 function collectEffects(step,out=new Set()){for(const x of step.effects??[])out.add(x);for(const x of step.then_steps??[])collectEffects(x,out);for(const x of step.else_steps??[])collectEffects(x,out);for(const x of step.do_steps??[])collectEffects(x,out);return out;}
 function collectStepRefs(step,out=new Set()){if(step.semantic_ref)out.add(step.semantic_ref);for(const x of step.then_steps??[])collectStepRefs(x,out);for(const x of step.else_steps??[])collectStepRefs(x,out);for(const x of step.do_steps??[])collectStepRefs(x,out);return out;}
-function collectStepGlobalRefs(step,symbols,scope,out=new Set()){if(step.kind==='foreach'){collectGlobalRefs(step.collection,symbols,scope,out);const loopScope={alias:step.item_alias,entityType:step.item_type};collectGlobalRefs(step.when,symbols,loopScope,out);for(const child of step.do_steps??[])collectStepGlobalRefs(child,symbols,loopScope,out);return out;}collectGlobalRefs(step.when,symbols,scope,out);collectGlobalRefs(step.target,symbols,scope,out);collectGlobalRefs(step.value,symbols,scope,out);for(const child of step.then_steps??[])collectStepGlobalRefs(child,symbols,scope,out);for(const child of step.else_steps??[])collectStepGlobalRefs(child,symbols,scope,out);return out;}
+function collectStepGlobalRefs(step,symbols,scope,out=new Set()){
+  if(step.kind==='foreach'){collectGlobalRefs(step.collection,symbols,scope,out);const loopScope={alias:step.item_alias,entityType:step.item_type};collectGlobalRefs(step.when,symbols,loopScope,out);for(const child of step.do_steps??[])collectStepGlobalRefs(child,symbols,loopScope,out);return out;}
+  collectGlobalRefs(step.when,symbols,scope,out);collectGlobalRefs(step.target,symbols,scope,out);collectGlobalRefs(step.value,symbols,scope,out);for(const child of step.then_steps??[])collectStepGlobalRefs(child,symbols,scope,out);for(const child of step.else_steps??[])collectStepGlobalRefs(child,symbols,scope,out);return out;
+}
 
-function compileUseCases(root,index,symbols,repositories,ports,unresolved){
+function compileUseCases(root,index,symbols,repositories,ports,transactionPlans,unresolved){
   const use_cases=[];
   for(const b of root.behaviors??[]){
     const guards=[],refs=new Set();
@@ -100,7 +124,8 @@ function compileUseCases(root,index,symbols,repositories,ports,unresolved){
     for(const post of b.postconditions??[]){const n=index.get(post);if(n?.expression)collectRefs(n.expression,refs);}
     const inputEntities=[...new Set([...refs].map(entityOfField).filter(entity=>entity&&symbols[entity]?.kind==='entity'))],effectIds=new Set();for(const step of steps)collectEffects(step,effectIds);
     const dependencies=[...repositories.filter(x=>x.semantic_refs.some(r=>effectIds.has(r))).map(x=>x.id),...ports.filter(x=>x.semantic_refs.some(r=>effectIds.has(r))).map(x=>x.id)];
-    use_cases.push({id:`usecase.${b.id.replace(/^behavior\./,'')}`,kind:'use_case',semantic_refs:[b.id],name:pascal(b.id.replace(/^behavior\./,'')),display_name:b.name??null,input_refs:inputEntities,inputs:inputEntities,guards,steps,outputs:b.outputs??[],failure_refs:b.failures??[],postconditions:b.postconditions??[],dependencies});
+    const transaction_plan_ids=transactionPlans.filter(x=>x.behavior_ref===b.id).map(x=>x.id);
+    use_cases.push({id:`usecase.${b.id.replace(/^behavior\./,'')}`,kind:'use_case',semantic_refs:[b.id],name:pascal(b.id.replace(/^behavior\./,'')),display_name:b.name??null,input_refs:inputEntities,inputs:inputEntities,guards,steps,outputs:b.outputs??[],failure_refs:b.failures??[],postconditions:b.postconditions??[],dependencies,transaction_plan_ids});
   }
   return use_cases;
 }
@@ -109,9 +134,9 @@ function compileErrors(root){const refs=new Set();for(const b of root.behaviors?
 function compile(clm,profile){
   const root=rootOf(clm),index=buildNodeIndex(clm),symbols=buildSymbolTable(clm),unresolved=[],domain=compileDomain(root),contracts=compileContracts(root);
   attachPersistenceMappings(contracts.repositories,profile,symbols,unresolved);
-  const plans=compilePlans(root,profile,unresolved),use_cases=compileUseCases(root,index,symbols,contracts.repositories,contracts.ports,unresolved),error_mappings=compileErrors(root);
+  const plans=compilePlans(root,profile,unresolved),use_cases=compileUseCases(root,index,symbols,contracts.repositories,contracts.ports,plans.transaction_plans,unresolved),error_mappings=compileErrors(root);
   const generation_regions=[...use_cases.map(u=>({id:`region.${u.id}`,mode:'generated',semantic_refs:u.semantic_refs})),...contracts.repositories.map(r=>({id:`region.${r.id}`,mode:'contract_only',semantic_refs:r.semantic_refs.length?r.semantic_refs:[r.entity_ref]})),...contracts.ports.map(p=>({id:`region.${p.id}`,mode:p.generation_mode,semantic_refs:p.semantic_refs}))];
-  const traceability=use_cases.map(u=>{const refs=new Set(u.semantic_refs);for(const g of u.guards??[])refs.add(g.semantic_ref);for(const step of u.steps??[])collectStepRefs(step,refs);return{implementation_id:u.id,semantic_refs:[...refs]};});
+  const traceability=use_cases.map(u=>{const refs=new Set(u.semantic_refs);for(const g of u.guards??[])refs.add(g.semantic_ref);for(const step of u.steps??[])collectStepRefs(step,refs);for(const planId of u.transaction_plan_ids??[]){const plan=plans.transaction_plans.find(x=>x.id===planId);for(const ref of plan?.semantic_refs??[])refs.add(ref);}return{implementation_id:u.id,semantic_refs:[...refs]};});
   return{iir:{version:'0.2',source_clm_id:root.id,source_clm_version:root.version,source_semantic_hash:semanticHash(clm),target_profile:profile,...domain,use_cases,repository_contracts:contracts.repositories,external_ports:contracts.ports,...plans,error_mappings,primitive_bindings:[],generation_regions,traceability,unresolved}};
 }
 
