@@ -24,7 +24,7 @@ if(profile){
   run('schema_validate.mjs',[profile,path.join(SCHEMAS,'target-profile-v0.1.schema.json')],'校验 Target Profile Schema');
   run('compile_iir.mjs',[working,profile,'-o',iir],'编译 IIR v0.2');
   run('schema_validate.mjs',[iir,path.join(SCHEMAS,'iir-v0.2.schema.json')],'校验 IIR Schema');
-  run('logic_cli.mjs',['validate-iir',iir],'校验 IIR Semantic');
+  run('validate_iir.mjs',[iir],'校验 IIR Semantic');
   run('compile_target_tests.mjs',[path.join(out,'test-vectors.json'),iir,'-o',targetTests],'编译目标测试计划');
   if(has('--generate-ts',args)){
     generated=path.join(out,'generated-ts');
