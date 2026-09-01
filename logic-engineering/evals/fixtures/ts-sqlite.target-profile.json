@@ -1,0 +1,16 @@
+{
+  "target_profile": {
+    "id": "ts-sqlite",
+    "language": "TypeScript",
+    "version": "5.x",
+    "runtime": "Node.js",
+    "framework": "framework-agnostic",
+    "architecture": "Clean Architecture",
+    "persistence": "SQLite",
+    "messaging": "none",
+    "transaction_strategy": "sqlite_transaction",
+    "error_model": "typed_errors",
+    "test_framework": "Vitest",
+    "binding_key": "ts-sqlite"
+  }
+}
