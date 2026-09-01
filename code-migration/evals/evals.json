@@ -8,7 +8,7 @@
       "prompt": "把 admin-a 和 admin-b 的订单中心迁入 target-console。两边订单状态、退款规则和权限不同，退款采用新产品规则。",
       "expected_output": "先恢复多来源真实语义并通过 07 功能融合映射归一化，再形成 Target Behavior；冲突或重大变化进入 08 决策记录，不能分别照搬两个 Source。",
       "files": [],
-      "assertions": ["多来源先归一化再实现。", "用户/产品新规则优先于旧来源冲突。", "重大目标变化可进入 08 决策记录。"]
+      "assertions": ["多来源先归一化再实现。", "用户/产品新规则优先于旧来源冲突。"]
     },
     {
       "id": 2,
@@ -16,47 +16,47 @@
       "prompt": "迁移订单详情。首屏只看到查看、退款、改地址，但代码还有轮询、409 恢复、管理员备注、Risk Flag、返回列表恢复筛选和退款后刷新 Timeline。",
       "expected_output": "中高风险先做正向入口和反向 API/State/Event/测试检查，把条件能力、自动行为、异常恢复和副作用纳入 Discovery；没有达到足够进入实施的覆盖时不能声称范围完整。",
       "files": [],
-      "assertions": ["不会只根据首屏盘点功能。", "会检查权限/Flag/状态分支和副作用。", "Discovery 有足够进入实施的停止条件。"]
+      "assertions": ["不会只根据首屏盘点功能。", "会检查权限/Flag/状态分支和副作用。"]
     },
     {
       "id": 3,
       "name": "prevent-hallucinated-features",
       "prompt": "Source 订单列表没有导出、收藏视图和批量操作，用户也没要求；Target 恰好有 ExportButton、SavedView、BulkAction。",
-      "expected_output": "这些最多是推断候选或设计建议，不能因为 Target 有组件就进入范围内必需 Atomic Item；任何正式新增必须有用户、产品、Target 强制约束或已确认 Decision 依据。",
+      "expected_output": "这些最多是推断候选或设计建议，不能因为 Target 有组件就进入范围内必需 Atomic Item；正式新增必须有用户、产品、Target 强制约束或已确认 Decision 依据。",
       "files": [],
-      "assertions": ["Target 组件不能反向决定产品范围。", "正式 Atomic Item 必须有 Provenance。", "无依据新增不进入必需范围。"]
+      "assertions": ["Target 组件不能反向决定产品范围。", "正式 Atomic Item 必须有 Provenance。"]
     },
     {
       "id": 4,
       "name": "interaction-semantics-fidelity",
       "prompt": "Source 删除订单需要确认弹窗、输入 DELETE、提交中防重复、409 保留输入不关闭，成功后 Toast、关闭并局部刷新且保持分页。",
-      "expected_output": "05 记录业务上必须保留的 WHAT，06 记录确认、Loading、409 恢复、关闭、分页/Focus 等 HOW/WHERE；不能简化成点击后调用 API。",
+      "expected_output": "行为契约记录业务上必须保留的 WHAT，页面结构/交互契约记录确认、Loading、409 恢复、关闭、分页/Focus 等 HOW/WHERE；不能简化成点击后调用 API。",
       "files": [],
-      "assertions": ["05 和 06 职责分开。", "复杂交互时序不会被简化。", "409 恢复和成功收尾进入验证。"]
+      "assertions": ["WHAT 和 HOW/WHERE 职责分开。", "复杂交互时序不会被简化。"]
     },
     {
       "id": 5,
       "name": "user-new-layout-plan",
       "prompt": "Source 订单详情是左右双栏并跳客户详情页。用户要求 Target 改成 Tabs + 右侧 Drawer，桌面 420px、移动端全屏。",
-      "expected_output": "把 Source 旧结构作为证据，把用户方案作为 Target 结构/交互目标写入 06，并按 Tabs + Drawer 新方案验证；与 Source 不同不是回归。",
+      "expected_output": "把 Source 旧结构作为证据，把用户方案作为 Target 结构/交互目标，并按 Tabs + Drawer 新方案验证；与 Source 不同不是回归。",
       "files": [],
-      "assertions": ["用户新方案优先于 Source 旧形态。", "06 记录 Target 区域树和响应式。", "验证面向批准后的新方案。"]
+      "assertions": ["用户新方案优先于 Source 旧形态。", "验证面向批准后的新方案。"]
     },
     {
       "id": 6,
       "name": "atomic-items-prevent-false-completion",
-      "prompt": "退款原来只有一个大条目：金额校验、重复提交、409 恢复、成功刷新。现在只做完金额校验，Agent 想把退款功能和订单模块标完成。",
-      "expected_output": "在 03 中按独立失败/验证边界拆为多个 Atomic Item，可选放入退款场景 Group；只完成金额校验时 Group、Feature、Module 都不能完成，状态必须逐层派生。",
+      "prompt": "订单模块已经模块化。退款原来只有一个大条目：金额校验、重复提交、409 恢复、成功刷新。现在只做完金额校验，Agent 想把退款功能和订单模块标完成。",
+      "expected_output": "在 modules/order/01-模块功能点.md 中按独立失败/验证边界拆为多个 Atomic Item；只完成金额校验时 Feature 和 Module 都不能完成，顶层 03 只显示派生摘要和模块链接。",
       "files": [],
-      "assertions": ["复合条目会拆成 Atomic Item。", "03 是 Atomic Item 实施事实源。", "局部完成不能推成 Feature/Module 完成。"]
+      "assertions": ["模块 01 是 Atomic Item 实施事实源。", "局部完成不能推成 Feature/Module 完成。", "顶层 03 不复制完整 Atomic Item 状态。"]
     },
     {
       "id": 7,
       "name": "temporary-batch-not-fact-source",
-      "prompt": "退款的四个 Atomic Item 共享 Drawer，希望一起开发并一次准备数据后一起验证。",
-      "expected_output": "可以在 09 中临时建立 DEV/VER Batch 提高效率，但 Batch 不是长期事实源；结束后必须逐 Atomic Item 回写实施和验证结果，单项失败不能被批次结果覆盖。",
+      "prompt": "订单模块退款的四个 Atomic Item 共享 Drawer，希望一起开发并一次准备数据后一起验证。",
+      "expected_output": "可以在 09 中临时建立 DEV/VER Batch，但 Batch 只引用 Atomic Item ID 和 modules/order/01-模块功能点.md；结束后逐 Atomic Item 回写真实结果。",
       "files": [],
-      "assertions": ["Workstream 是所有权/并行边界。", "Batch 只是临时执行分组。", "结果逐 Atomic Item 落账。"]
+      "assertions": ["Workstream 是所有权/并行边界。", "Batch 不是长期事实源。", "结果写回模块 01。"]
     },
     {
       "id": 8,
@@ -68,57 +68,57 @@
     },
     {
       "id": 9,
-      "name": "risk-adaptive-model-budget",
-      "prompt": "A 是纯文案小组件，B 是复杂订单详情，C 是真实资金退款状态机并计划多 Agent。",
-      "expected_output": "A 仅需 Feature + Atomic Item + Provenance + 最小验证；B 按需增加关键 04/05/06 和 Discovery；C 使用高风险完整治理、输入基线、独立验证和必要集成验证。",
+      "name": "risk-adaptive-module-docs",
+      "prompt": "A 是一个只有一个 Feature 的低风险静态模块；B 是有 6 个 Feature、跨会话推进的订单模块；C 是高风险退款模块，需要行为和页面交互验证。",
+      "expected_output": "A 可以直接留在顶层 03；B 创建 modules/<module>/00 和 01；C 在 00/01 基础上按需增加模块 02/03/04。不会所有模块固定生成五个文件。",
       "files": [],
-      "assertions": ["低风险不会机械创建所有文档。", "风险控制文档数量和 ID 密度。", "高风险启用完整治理。"]
+      "assertions": ["模块目录按复杂度自适应。", "低风险小模块不强制拆目录。", "高风险模块按需增加契约。"]
     },
     {
       "id": 10,
-      "name": "workspace-resume-standard-order",
-      "prompt": "这是新对话，目标仓库已有 `.code-migration/`，之前迁了一部分订单中心，请继续。",
-      "expected_output": "先读 00，再恢复 01 目标、02 生效规则、03 Atomic Item 状态，按需读取 04–08，最后读取 09 Workstream/输入基线并核对 Git、代码和测试。",
+      "name": "workspace-resume-through-module-index",
+      "prompt": "这是新对话，订单中心已经拆到 .code-migration/modules/order/，请继续之前的退款迁移。",
+      "expected_output": "先读 00、01、02，再读顶层 03 定位订单模块，进入 modules/order/00-模块总览.md 并读取 01-模块功能点.md 恢复真实 Atomic Item 状态，再按需读取模块 02–04 和顶层共享文档，最后恢复 09 Workstream 并核对 Git/测试。",
       "files": [],
-      "assertions": ["00 是第一恢复入口。", "02 规则在开发前恢复。", "03 是范围和实施事实源。", "09 是执行调度而非范围事实源。"]
+      "assertions": ["顶层 03 是模块导航而不是完整 Atomic Item 台账。", "模块 01 是详细状态权威源。", "恢复使用模块链接。"]
     },
     {
       "id": 11,
-      "name": "standard-output-numbering",
-      "prompt": "为一个高风险多来源前端迁移初始化完整 `.code-migration/` 工作区。",
-      "expected_output": "标准顶层产物按 00 状态总览、01 任务上下文、02 迁移约束、03 功能点台账、04 功能语义、05 源行为、06 页面结构与交互、07 功能融合、08 迁移决策、09 执行计划稳定编号；不得创建无序号同类顶层文档。",
+      "name": "module-index-links",
+      "prompt": "订单、用户、报表三个模块已经拆目录，请生成顶层迁移模块索引。",
+      "expected_output": "03 使用相对 Markdown 链接指向每个 modules/<module>/00-模块总览.md，并显示 Feature 完成度、失败/阻塞和模块派生状态；不把三个模块的 Atomic Item 全部复制到顶层。",
       "files": [],
-      "assertions": ["标准模板使用两位前置序号。", "编号按产出/使用顺序而不是历史追加。", "没有与标准用途重复的无序号顶层文档。"]
+      "assertions": ["模块名称可快速跳转到模块入口。", "03 只保存派生摘要。", "没有顶层/模块双写 Atomic Item。"]
     },
     {
       "id": 12,
-      "name": "behavior-ledger-authority-boundary",
-      "prompt": "订单详情 Atomic Item 已在 03 标为处理要求满足，现在验证返回列表保留用户上下文和具体滚动/Focus 恢复。",
-      "expected_output": "03 不重复验证语义；05 验证返回上下文这一 WHAT；06 验证 filter/page/scroll/focus 的 HOW/WHERE。05/06 不复制 03 的实施状态。",
+      "name": "checkbox-is-completion-projection",
+      "prompt": "模块总览里退款 Feature 被人手工改成 [x]，但 modules/order/01 中 I03 仍是验证失败，Feature 生命周期仍是验证中。",
+      "expected_output": "以模块 01 的真实状态为准，把 Feature Checkbox 修回 [ ] 并显示验证中/失败信息；不得因为 Checkbox 被勾选就把 Feature 或 Module 推进为完成。",
       "files": [],
-      "assertions": ["03/05/06 权威边界清晰。", "05 只关联 Atomic Item。", "05 与 06 不双写同一交互时序。"]
+      "assertions": ["Checkbox 不是状态输入。", "真实状态覆盖 Checkbox。", "Feature/Module 完成仍然派生。"]
     },
     {
       "id": 13,
-      "name": "required-tool-unavailable",
-      "prompt": "02 中生效规则要求所有页面 UI 回归必须使用 Playwright，但当前环境没有 Playwright/浏览器能力。",
-      "expected_output": "不静默替代工具；相关 Atomic Item/Workstream 标为已阻塞并记录解除条件，由用户决定启用、允许替代、修改规则或延后。",
+      "name": "global-vs-module-contracts",
+      "prompt": "订单模块有自己的退款行为和 Drawer 结构；App Shell 的全局导航/布局被多个模块共享。",
+      "expected_output": "订单私有 WHAT/HOW-WHERE 写在 modules/order/03 和 04；跨模块共享 App Shell / 全局行为才写顶层 05/06。不能两边复制同一事实。",
       "files": [],
-      "assertions": ["02 强规则会在实施前检查。", "必须工具不可用不会静默换工具。"]
+      "assertions": ["模块私有事实下沉模块目录。", "跨模块事实保留顶层。", "同一契约不双写。"]
     },
     {
       "id": 14,
       "name": "controlled-parallel-and-integration",
       "prompt": "Alerts、User Settings、Order Export 互相独立，希望并行；Refund Drawer 与 Order Detail 共享状态/API。",
-      "expected_output": "独立能力可建立不同 Workstream；共享状态/API 的退款能力不能直接并行。环境不能安全隔离时串行降级；共享 Route/Layout/API/State 等边界命中时执行必要集成验证。",
+      "expected_output": "独立能力可建立不同 Workstream；共享状态/API 的退款能力不能直接并行。环境不能安全隔离时串行降级；共享边界命中时执行必要集成验证。",
       "files": [],
-      "assertions": ["Workstream 是并行边界。", "共享语义/代码边界会阻止不安全并行。", "环境不支持时不伪造并行。"]
+      "assertions": ["Workstream 是并行边界。", "共享语义/代码边界会阻止不安全并行。"]
     },
     {
       "id": 15,
       "name": "approved-target-change-not-regression",
       "prompt": "Source 每页 100 条并支持批量删除；Target 产品明确改为每页 50 条且取消批量删除。",
-      "expected_output": "把批准变化写入 Target Behavior/必要的 08 Decision，并按每页 50 条且无批量删除验证；不能因与 Source 不同而修回旧行为。",
+      "expected_output": "把批准变化写入 Target Behavior/必要 Decision，并按每页 50 条且无批量删除验证；不能因与 Source 不同而修回旧行为。",
       "files": [],
       "assertions": ["批准变化成为验证基准。", "有意 Target 差异不是回归。"]
     },
@@ -126,9 +126,9 @@
       "id": 16,
       "name": "discovery-stops-when-sufficient",
       "prompt": "订单查询中风险迁移已经覆盖主要入口、关键 API 反向调用、权限/Flag 分支、相关测试，所有发现项都有来源和范围分类，没有关键未知。",
-      "expected_output": "Discovery 可以判定为足够进入实施，不继续为了证明数学意义上的 100% 完整而无限扫描；仍允许开发中发现新事实后重新校准。",
+      "expected_output": "Discovery 可以判定为足够进入实施，不继续为了证明数学意义上的 100% 完整而无限扫描；仍允许开发中发现新事实后局部重新校准。",
       "files": [],
-      "assertions": ["Discovery 有明确停止条件。", "不会无限分析。", "新事实仍可触发局部重新校准。"]
+      "assertions": ["Discovery 有明确停止条件。", "不会无限分析。"]
     }
   ]
 }
