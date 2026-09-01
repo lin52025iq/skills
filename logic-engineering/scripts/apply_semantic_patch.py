@@ -6,9 +6,7 @@
 - 修改前校验 before/preconditions
 - 输出语义差异摘要
 - 保持操作目标基于稳定 Semantic ID，而不是文件路径
-
-输入：
-    python apply_semantic_patch.py clm.json patch.json [-o out.json]
+- 节点集合与 kind 映射统一由 clm_model.py 管理
 """
 
 from __future__ import annotations
@@ -18,16 +16,14 @@ import copy
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, List, Tuple
 
-NODE_COLLECTIONS = (
-    "domain",
-    "behaviors",
-    "states",
-    "effects",
-    "constraints",
-    "scenarios",
-    "primitives",
+from clm_model import (
+    CANONICAL_COLLECTIONS,
+    build_node_location_index,
+    ensure_collection,
+    infer_collection_for_node,
+    root_of,
 )
 
 
@@ -43,19 +39,11 @@ def save_json(path: Path, value: Dict[str, Any]) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def iter_nodes(clm: Dict[str, Any]) -> Iterable[Tuple[str, Dict[str, Any]]]:
-    root = clm.get("clm", clm)
-    for collection in NODE_COLLECTIONS:
-        for node in root.get(collection, []) or []:
-            if isinstance(node, dict):
-                yield collection, node
-
-
 def find_node(clm: Dict[str, Any], semantic_id: str) -> Tuple[str, Dict[str, Any]]:
-    for collection, node in iter_nodes(clm):
-        if node.get("id") == semantic_id:
-            return collection, node
-    raise PatchError(f"找不到目标语义节点: {semantic_id}")
+    item = build_node_location_index(clm).get(semantic_id)
+    if item is None:
+        raise PatchError(f"找不到目标语义节点: {semantic_id}")
+    return item
 
 
 def get_by_path(obj: Any, path: List[str]) -> Any:
@@ -92,18 +80,24 @@ def set_by_path(obj: Any, path: List[str], value: Any) -> None:
                 idx = int(part)
             except ValueError as exc:
                 raise PatchError(f"列表路径必须使用整数索引: {part}") from exc
+            if idx < 0 or idx >= len(cur):
+                raise PatchError(f"列表索引越界: {part}")
             cur = cur[idx]
         else:
             raise PatchError(f"无法继续解析字段路径: {'.'.join(path)}")
 
     last = path[-1]
     if isinstance(cur, dict):
+        if last not in cur:
+            raise PatchError(f"字段不存在: {'.'.join(path)}")
         cur[last] = value
     elif isinstance(cur, list):
         try:
             idx = int(last)
         except ValueError as exc:
             raise PatchError(f"列表路径必须使用整数索引: {last}") from exc
+        if idx < 0 or idx >= len(cur):
+            raise PatchError(f"列表索引越界: {last}")
         cur[idx] = value
     else:
         raise PatchError(f"无法更新字段路径: {'.'.join(path)}")
@@ -131,7 +125,7 @@ def apply_patch(clm: Dict[str, Any], raw_patch: Dict[str, Any]) -> Tuple[Dict[st
         raise PatchError("补丁缺少 operation")
 
     result = copy.deepcopy(clm)
-    root = result.get("clm", result)
+    root = root_of(result)
     diff: Dict[str, Any] = {
         "patch_id": patch.get("patch_id"),
         "target_semantic_id": target,
@@ -140,10 +134,7 @@ def apply_patch(clm: Dict[str, Any], raw_patch: Dict[str, Any]) -> Tuple[Dict[st
     }
 
     if operation == "ADD_NODE":
-        collection = patch.get("collection")
         node = patch.get("after")
-        if collection not in NODE_COLLECTIONS:
-            raise PatchError(f"ADD_NODE collection 非法: {collection}")
         if not isinstance(node, dict) or not node.get("id"):
             raise PatchError("ADD_NODE after 必须是带 id 的完整节点")
         try:
@@ -152,7 +143,21 @@ def apply_patch(clm: Dict[str, Any], raw_patch: Dict[str, Any]) -> Tuple[Dict[st
             pass
         else:
             raise PatchError(f"语义 ID 已存在: {node['id']}")
-        root.setdefault(collection, []).append(node)
+
+        requested_collection = patch.get("collection")
+        try:
+            inferred_collection = infer_collection_for_node(node)
+        except ValueError as exc:
+            raise PatchError(str(exc)) from exc
+        collection = requested_collection or inferred_collection
+        if collection not in CANONICAL_COLLECTIONS:
+            raise PatchError(f"ADD_NODE collection 非法: {collection}")
+        if collection != inferred_collection:
+            raise PatchError(
+                f"ADD_NODE 节点 kind={node.get('kind')} 应位于 {inferred_collection}，"
+                f"不能写入 {collection}"
+            )
+        ensure_collection(root, collection).append(node)
         diff["changes"].append({"type": "node_added", "id": node["id"], "collection": collection})
         return result, diff
 
