@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "v02-valid-order-cancel",
+      "input": "evals/fixtures/order-cancel.v0.2.valid.json",
+      "schema": "schemas/clm-v0.2.schema.json",
+      "expect": {
+        "valid": true,
+        "forbidden_error_codes": [
+          "NODE_COLLECTION_MISMATCH",
+          "UNKNOWN_SYMBOL",
+          "TYPE_MISMATCH",
+          "INVALID_ENUM_VALUE",
+          "INVALID_TYPED_EXPRESSION"
+        ]
+      }
+    },
+    {
+      "id": "v01-compat-warning",
+      "input": "evals/fixtures/order-cancel.valid.json",
+      "expect": {
+        "warning_any_of": [
+          "LEGACY_RULE_SHAPE",
+          "LEGACY_EXPRESSION_SHAPE"
+        ]
+      }
+    },
+    {
+      "id": "v01-to-v02-migration",
+      "source": "evals/fixtures/order-cancel.valid.json",
+      "migration": "scripts/migrate_clm_v01_to_v02.py",
+      "expect": {
+        "output_version": "0.2",
+        "rules_use_expression": true
+      }
+    },
+    {
+      "id": "symbol-table-order-fields",
+      "input": "evals/fixtures/order-cancel.v0.2.valid.json",
+      "script": "scripts/symbol_table.py",
+      "expect_symbols": [
+        "domain.order.status",
+        "domain.order.owner_id",
+        "domain.current_user.id",
+        "domain.order_status"
+      ]
+    },
+    {
+      "id": "v02-human-projection",
+      "input": "evals/fixtures/order-cancel.v0.2.valid.json",
+      "script": "scripts/render_human_logic.py",
+      "expect_contains": [
+        "取消订单",
+        "domain.order.owner_id等于domain.current_user.id",
+        "允许取消的订单状态",
+        "已取消"
+      ]
+    }
+  ]
+}
