@@ -8,7 +8,7 @@ function arg(name,args){const i=args.indexOf(name);return i>=0?args[i+1]:null}
 function has(name,args){return args.includes(name)}
 function run(script,args,label){const p=spawnSync(process.execPath,[path.join(DIR,script),...args],{encoding:'utf8'});if(p.status!==0){console.error(JSON.stringify({ok:false,stage:label,stdout:p.stdout,stderr:p.stderr},null,2));process.exit(p.status??1)}if(p.stdout?.trim())console.log(`[${label}]\n${p.stdout.trim()}`)}
 function clmSchema(file){const v=String(rootOf(readJson(file)).version??'0.1');return path.join(SCHEMAS,v==='0.2'?'clm-v0.2.schema.json':'clm-v0.1.schema.json')}
-function validateClm(file,label){run('schema_validate.mjs',[file,clmSchema(file)],`${label} Schema`);run('logic_cli.mjs',['validate-clm',file],`${label} Semantic`)}
+function validateClm(file,label){run('schema_validate.mjs',[file,clmSchema(file)],`${label} Schema`);run('validate_clm.mjs',[file],`${label} Semantic`)}
 const [model,...args]=process.argv.slice(2);if(!model){console.error('usage: node run_pipeline.mjs model.json [--patch p.json | --change-set c.json] [--target-profile profile.json] [--generate-ts] [--verify-ts] [--output-dir dir]');process.exit(2)}
 const out=arg('--output-dir',args)??'.logic-engineering-output',patch=arg('--patch',args),change=arg('--change-set',args),profile=arg('--target-profile',args);if(patch&&change){console.error('--patch 与 --change-set 不能同时使用');process.exit(2)}
 fs.mkdirSync(out,{recursive:true});let working=model;validateClm(working,'校验原始 CLM');let changed=[];
