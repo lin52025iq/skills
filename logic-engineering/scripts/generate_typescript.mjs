@@ -6,104 +6,155 @@ import {readJson,writeJson} from './lib/model.mjs';
 
 function pascal(value){return String(value??'Generated').split(/[^A-Za-z0-9]+/).filter(Boolean).map(x=>x[0].toUpperCase()+x.slice(1)).join('')||'Generated';}
 function camel(value){const p=pascal(value);return p[0].toLowerCase()+p.slice(1);}
+function property(value){const parts=String(value??'field').split(/[^A-Za-z0-9]+/).filter(Boolean);return parts.length?parts[0].toLowerCase()+parts.slice(1).map(x=>x[0].toUpperCase()+x.slice(1)).join(''):'field';}
 function hash(content){return crypto.createHash('sha256').update(content).digest('hex');}
-function blockers(root){return (root.unresolved??[]).filter(x=>typeof x==='string'||x?.blocking!==false);}
-function put(root,rel,content,refs,artifacts){const file=path.join(root,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content,'utf8');artifacts.push({path:rel,semantic_refs:refs.filter(Boolean),generation_mode:'generated',content_hash:hash(content)});}
-function methodName(op){const raw=typeof op==='string'?op:(op?.name??'execute');return camel(raw);}
+function blockers(root){return (root.unresolved??[]).filter(x=>typeof x==='string'||x?.severity==='blocking'||x?.blocking===true);}
+function put(root,rel,content,refs,artifacts){const file=path.join(root,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content,'utf8');artifacts.push({path:rel,semantic_refs:(refs??[]).filter(Boolean),generation_mode:'generated',content_hash:hash(content)});}
+function methodName(op){const raw=typeof op==='string'?op:(op?.name??'execute');return property(raw);}
 function interfaceName(item){return pascal(item.name??item.id);}
 function errorClass(ref){return `${pascal(String(ref).replace(/^error\./,''))}Error`;}
+function guardName(ref){return `guard${pascal(String(ref).replace(/^rule\./,''))}`;}
+function useCaseName(uc){return `${pascal(uc.name??uc.semantic_refs?.[0]??uc.id)}UseCase`;}
 
-function portsSource(root){
+function domainMaps(root){
+  const enums=new Map((root.domain_types?.enums??[]).map(x=>[x.semantic_ref,{...x,tsName:pascal(x.name??x.semantic_ref.replace(/^domain\./,''))}]));
+  const entities=new Map((root.domain_types?.entities??[]).map(x=>[x.semantic_ref,{...x,tsName:pascal(x.name??x.semantic_ref.replace(/^domain\./,''))}]));
+  const bindings=new Map((root.runtime_bindings??[]).map(x=>[x.semantic_ref,x]));
+  return {enums,entities,bindings};
+}
+function tsType(typeRef,maps){if(!typeRef)return'unknown';if(maps.enums.has(typeRef))return maps.enums.get(typeRef).tsName;if(maps.entities.has(typeRef))return maps.entities.get(typeRef).tsName;return {string:'string',boolean:'boolean',integer:'number',number:'number',datetime:'Date',date:'Date',duration:'number'}[typeRef]??'unknown';}
+function entitySlot(entityRef,maps){return maps.entities.get(entityRef)?.slot??camel(String(entityRef).replace(/^domain\./,''));}
+function accessRef(ref,maps,base='input'){
+  const b=maps.bindings.get(ref);if(!b)return `${base}[${JSON.stringify(ref)}]`;
+  if(b.kind==='entity')return `${base}.${property(b.slot)}`;
+  return `${base}.${property(b.slot)}.${(b.path??[]).map(property).join('.')}`;
+}
+function typedValueTs(v,maps,base='input'){
+  if(v==null)return'undefined';
+  if(typeof v!=='object')return JSON.stringify(v);
+  if(typeof v.ref==='string')return accessRef(v.ref,maps,base);
+  if('literal'in v)return JSON.stringify(v.literal);
+  if(v.enum){const e=maps.enums.get(v.enum.type);return e?`${e.tsName}.${pascal(v.enum.value)}`:JSON.stringify(v.enum.value);}
+  if(v.null)return'null';
+  if(Array.isArray(v.set))return`[${v.set.map(x=>typedValueTs(x,maps,base)).join(', ')}]`;
+  return'undefined';
+}
+function exprTs(e,maps,base='input'){
+  if(!e?.op)return'false';
+  if(e.op==='all')return`(${(e.items??[]).map(x=>exprTs(x,maps,base)).join(' && ')||'true'})`;
+  if(e.op==='any')return`(${(e.items??[]).map(x=>exprTs(x,maps,base)).join(' || ')||'false'})`;
+  if(e.op==='not')return`!(${exprTs(e.item,maps,base)})`;
+  const l=typedValueTs(e.left,maps,base),r=typedValueTs(e.right,maps,base);
+  if(e.op==='in')return`${r}.includes(${l})`;
+  if(e.op==='not_in')return`!${r}.includes(${l})`;
+  return `${l} ${{eq:'===',ne:'!==',lt:'<',le:'<=',gt:'>',ge:'>='}[e.op]??'==='} ${r}`;
+}
+function refsIn(v,out=new Set()){if(Array.isArray(v))for(const x of v)refsIn(x,out);else if(v&&typeof v==='object'){if(typeof v.ref==='string')out.add(v.ref);for(const x of Object.values(v))refsIn(x,out);}return out;}
+function entityRefsForExpr(expr,maps){const out=new Set();for(const ref of refsIn(expr)){const b=maps.bindings.get(ref);if(b?.entity_ref)out.add(b.entity_ref);else if(b?.kind==='entity')out.add(ref);}return [...out];}
+function pickFieldsForExpr(expr,maps){const byEntity=new Map();for(const ref of refsIn(expr)){const b=maps.bindings.get(ref);if(b?.kind==='field'){if(!byEntity.has(b.entity_ref))byEntity.set(b.entity_ref,new Set());byEntity.get(b.entity_ref).add(property((b.path??[]).at(-1)));}}return byEntity;}
+
+function domainSource(root,maps){
   const lines=['// Code generated by logic-engineering. DO NOT EDIT.',''];
-  for(const item of [...(root.repository_contracts??[]),...(root.external_ports??[])]){
+  for(const e of maps.enums.values()){
+    lines.push(`export enum ${e.tsName} {`);
+    for(const value of e.values??[])lines.push(`  ${pascal(value)} = ${JSON.stringify(value)},`);
+    lines.push('}','');
+  }
+  for(const entity of maps.entities.values()){
+    lines.push(`export interface ${entity.tsName} {`);
+    for(const f of entity.fields??[]){const optional=f.nullable?'?':'';lines.push(`  ${property(f.name)}${optional}: ${tsType(f.type_ref,maps)}${f.nullable?' | null':''};`);}
+    lines.push('}','');
+  }
+  return lines.join('\n');
+}
+function portsSource(root,maps){
+  const domainTypes=[...maps.entities.values()].map(x=>x.tsName);const lines=['// Code generated by logic-engineering. DO NOT EDIT.'];
+  if(domainTypes.length)lines.push(`import type { ${domainTypes.join(', ')} } from '../domain/generated.js';`);lines.push('');
+  for(const item of root.repository_contracts??[]){
+    const entity=maps.entities.get(item.entity_ref),entityType=entity?.tsName??'unknown';
     lines.push(`export interface ${interfaceName(item)} {`);
-    for(const op of item.operations??['execute']) lines.push(`  ${methodName(op)}(): Promise<void>;`);
+    for(const op of item.operations??[]){const name=methodName(op);if(name==='save')lines.push(`  save(entity: ${entityType}): Promise<void>;`);else lines.push(`  ${name}(...args: unknown[]): Promise<unknown>;`);}
     lines.push('}','');
   }
+  for(const item of root.external_ports??[]){lines.push(`export interface ${interfaceName(item)} {`);for(const op of item.operations??[])lines.push(`  ${methodName(op)}(...args: unknown[]): Promise<unknown>;`);lines.push('}','');}
   return lines.join('\n');
 }
-
 function errorsSource(root){
-  const refs=[...new Set((root.error_mappings??[]).map(x=>x.semantic_error_ref??x.semantic_id??x.source).filter(x=>typeof x==='string'))];
-  const lines=['// Code generated by logic-engineering. DO NOT EDIT.',''];
-  for(const ref of refs){
-    lines.push(`export class ${errorClass(ref)} extends Error {`);
-    lines.push(`  readonly semanticId = ${JSON.stringify(ref)};`);
-    lines.push('  constructor(message = '+JSON.stringify(ref)+') {');
-    lines.push('    super(message);');
-    lines.push(`    this.name = ${JSON.stringify(errorClass(ref))};`);
-    lines.push('  }');
-    lines.push('}','');
-  }
+  const refs=[...new Set((root.error_mappings??[]).map(x=>x.semantic_error_ref).filter(Boolean))];const lines=['// Code generated by logic-engineering. DO NOT EDIT.',''];
+  lines.push('export class GuardViolationError extends Error { constructor(readonly semanticId: string) { super(`guard failed: ${semanticId}`); this.name = "GuardViolationError"; } }','');
+  for(const ref of refs){lines.push(`export class ${errorClass(ref)} extends Error {`,`  readonly semanticId = ${JSON.stringify(ref)};`,`  constructor(message = ${JSON.stringify(ref)}) { super(message); this.name = ${JSON.stringify(errorClass(ref))}; }`,'}','');}
   return lines.join('\n');
 }
-
-function usecasesSource(root){
-  const contracts=new Map([...((root.repository_contracts??[]).map(x=>[x.id,interfaceName(x)])),...((root.external_ports??[]).map(x=>[x.id,interfaceName(x)]))]);
-  const imports=[...new Set(contracts.values())];
+function rulesSource(root,maps){
   const lines=['// Code generated by logic-engineering. DO NOT EDIT.'];
-  if(imports.length) lines.push(`import type { ${imports.join(', ')} } from '../ports/generated.js';`);
-  lines.push('');
+  const neededTypes=new Set();
+  for(const uc of root.use_cases??[])for(const g of uc.guards??[])for(const e of entityRefsForExpr(g.expression,maps)){const t=maps.entities.get(e)?.tsName;if(t)neededTypes.add(t);}
+  if(neededTypes.size)lines.push(`import type { ${[...neededTypes].join(', ')} } from '../domain/generated.js';`);lines.push('');
+  const emitted=new Set();
+  for(const uc of root.use_cases??[])for(const g of uc.guards??[]){if(!g.semantic_ref||emitted.has(g.semantic_ref))continue;emitted.add(g.semantic_ref);const picks=pickFieldsForExpr(g.expression,maps),parts=[];for(const entityRef of entityRefsForExpr(g.expression,maps)){const entity=maps.entities.get(entityRef);if(!entity)continue;const fields=[...(picks.get(entityRef)??[])];const type=fields.length?`Pick<${entity.tsName}, ${fields.map(x=>JSON.stringify(x)).join(' | ')}>`:entity.tsName;parts.push(`${property(entity.slot)}: ${type}`);}lines.push(`export function ${guardName(g.semantic_ref)}(input: { ${parts.join('; ')} }): boolean {`);lines.push(`  return ${exprTs(g.expression,maps)};`);lines.push('}','');}
+  return lines.join('\n');
+}
+function usecasesSource(root,maps){
+  const contracts=new Map([...((root.repository_contracts??[]).map(x=>[x.id,interfaceName(x)])),...((root.external_ports??[]).map(x=>[x.id,interfaceName(x)]))]);
+  const imports=[...new Set(contracts.values())],entityTypes=[...new Set((root.use_cases??[]).flatMap(u=>(u.input_refs??[]).map(r=>maps.entities.get(r)?.tsName).filter(Boolean)))],guardImports=[...new Set((root.use_cases??[]).flatMap(u=>(u.guards??[]).map(g=>guardName(g.semantic_ref))))];
+  const lines=['// Code generated by logic-engineering. DO NOT EDIT.'];if(imports.length)lines.push(`import type { ${imports.join(', ')} } from '../ports/generated.js';`);if(entityTypes.length)lines.push(`import type { ${entityTypes.join(', ')} } from '../domain/generated.js';`);if(guardImports.length)lines.push(`import { ${guardImports.join(', ')} } from '../rules/generated.js';`);lines.push(`import { GuardViolationError } from '../errors/generated.js';`,'');
   for(const uc of root.use_cases??[]){
-    const className=`${pascal(uc.name??uc.semantic_id??uc.id)}UseCase`;
-    const deps=(uc.dependencies??[]).map(id=>({id,type:contracts.get(id)??'unknown',field:camel(id)}));
-    lines.push(`export class ${className} {`);
-    if(deps.length){
-      const params=deps.map(d=>`private readonly ${d.field}: ${d.type}`).join(', ');
-      lines.push(`  constructor(${params}) {}`);
-    }else lines.push('  constructor() {}');
-    lines.push('');
-    lines.push('  async execute(): Promise<void> {');
-    lines.push(`    // semantic: ${uc.semantic_id??uc.id}`);
-    for(const g of uc.guards??[]) lines.push(`    // guard: ${JSON.stringify(g)}`);
-    for(const s of uc.steps??[]) lines.push(`    // step: ${JSON.stringify(s)}`);
-    lines.push(`    throw new Error(${JSON.stringify(`generated skeleton for ${uc.semantic_id??uc.id}: executable mapping pending`)});`);
+    const className=useCaseName(uc),inputName=`${className}Input`,deps=(uc.dependencies??[]).map(id=>({id,type:contracts.get(id)??'unknown',field:camel(id)}));
+    lines.push(`export interface ${inputName} {`);for(const ref of uc.input_refs??[]){const e=maps.entities.get(ref);if(e)lines.push(`  ${property(e.slot)}: ${e.tsName};`);}lines.push('}','');
+    lines.push(`export class ${className} {`);if(deps.length)lines.push(`  constructor(${deps.map(d=>`private readonly ${d.field}: ${d.type}`).join(', ')}) {}`);else lines.push('  constructor() {}');lines.push('',`  async execute(input: ${inputName}): Promise<void> {`);
+    for(const g of uc.guards??[]){lines.push(`    if (!${guardName(g.semantic_ref)}(input)) throw new GuardViolationError(${JSON.stringify(g.semantic_ref)});`);}
+    for(const s of uc.steps??[]){
+      if(s.kind==='action'&&s.operation==='assign'&&s.target?.ref){lines.push(`    ${accessRef(s.target.ref,maps)} = ${typedValueTs(s.value,maps)};`);}
+      for(const effect of s.effects??[]){const repo=(root.repository_contracts??[]).find(r=>(r.semantic_refs??[]).includes(effect));if(repo){const dep=deps.find(d=>d.id===repo.id);const entity=maps.entities.get(repo.entity_ref);if(dep&&entity)lines.push(`    await this.${dep.field}.save(input.${property(entity.slot)});`);}const port=(root.external_ports??[]).find(p=>(p.semantic_refs??[]).includes(effect));if(port){const dep=deps.find(d=>d.id===port.id),op=port.operations?.[0];if(dep&&op)lines.push(`    await this.${dep.field}.${methodName(op)}();`);}}
+    }
     lines.push('  }','}','');
   }
   return lines.join('\n');
 }
-
-function testsSource(plan){
-  const cases=(plan.target_test_plan??plan).cases??[];
-  const lines=['// Code generated by logic-engineering. DO NOT EDIT.','import { describe, expect, it } from "vitest";','','describe("generated logic tests", () => {'];
+function defaultValue(typeRef,maps,seed){if(maps.enums.has(typeRef)){const e=maps.enums.get(typeRef);return `${e.tsName}.${pascal(e.values?.[0]??'')}`;}if(typeRef==='string')return JSON.stringify(`fixture-${seed}`);if(['integer','number','duration'].includes(typeRef))return'0';if(typeRef==='boolean')return'false';return'undefined as never';}
+function fixtureAssignments(testCase,uc,root,maps){
+  const values=new Map(Object.entries(testCase.given??{}));
+  for(const expr of testCase.fixture_constraints??[]){if(expr?.op==='eq'&&expr.left?.ref&&expr.right?.ref&&!values.has(expr.left.ref)&&!values.has(expr.right.ref)){const sentinel=`fixture-${pascal(expr.left.ref)}`;values.set(expr.left.ref,sentinel);values.set(expr.right.ref,sentinel);}}
+  const entityLines=[];
+  for(const ref of uc?.input_refs??[]){const e=maps.entities.get(ref);if(!e)continue;entityLines.push(`const ${property(e.slot)}: ${e.tsName} = {`);for(const f of e.fields??[]){let raw=values.get(f.semantic_ref),code;if(raw!==undefined){const enumType=maps.enums.get(f.type_ref);code=enumType?`${enumType.tsName}.${pascal(raw)}`:JSON.stringify(raw);}else code=defaultValue(f.type_ref,maps,f.semantic_ref);entityLines.push(`  ${property(f.name)}: ${code},`);}entityLines.push('};');}
+  return entityLines;
+}
+function fakeLines(uc,root,maps){const lines=[],args=[];for(const depId of uc?.dependencies??[]){const field=camel(depId);args.push(field);const repo=(root.repository_contracts??[]).find(x=>x.id===depId);if(repo){const methods=(repo.operations??[]).map(op=>`${methodName(op)}: async () => undefined`).join(', ');lines.push(`const ${field} = { ${methods} };`);}else{const port=(root.external_ports??[]).find(x=>x.id===depId);const methods=(port?.operations??[]).map(op=>`${methodName(op)}: async () => undefined`).join(', ');lines.push(`const ${field} = { ${methods} };`);}}return {lines,args};}
+function testsSource(root,plan,maps){
+  const cases=(plan.target_test_plan??plan).cases??[],guardCases=cases.filter(c=>c.target_kind==='guard'&&!(c.unsupported??[]).length),ucCases=cases.filter(c=>c.target_kind==='use_case'),guardNames=[...new Set(guardCases.map(c=>guardName(c.target_id)))],ucNames=[...new Set(ucCases.map(c=>{const uc=(root.use_cases??[]).find(u=>u.id===c.use_case_id);return uc?useCaseName(uc):null;}).filter(Boolean))],domainImports=new Set();
+  for(const c of cases)for(const [ref] of Object.entries(c.given??{})){const b=maps.bindings.get(ref),e=b?.entity_ref?maps.entities.get(b.entity_ref):null;if(e)domainImports.add(e.tsName);const f=e?.fields?.find(x=>x.semantic_ref===ref),en=f?maps.enums.get(f.type_ref):null;if(en)domainImports.add(en.tsName);}for(const uc of root.use_cases??[])for(const ref of uc.input_refs??[]){const e=maps.entities.get(ref);if(e)domainImports.add(e.tsName);for(const f of e?.fields??[]){const en=maps.enums.get(f.type_ref);if(en)domainImports.add(en.tsName);}}
+  const lines=['// Code generated by logic-engineering. DO NOT EDIT.','import { describe, expect, it } from "vitest";'];if(domainImports.size)lines.push(`import { ${[...domainImports].join(', ')} } from '../domain/generated.js';`);if(guardNames.length)lines.push(`import { ${guardNames.join(', ')} } from '../rules/generated.js';`);if(ucNames.length)lines.push(`import { ${ucNames.join(', ')} } from '../usecases/generated.js';`);lines.push('','describe("generated logic tests", () => {');
   for(const c of cases){
-    lines.push(`  it(${JSON.stringify(c.id)}, async () => {`);
-    lines.push(`    // Given: ${JSON.stringify(c.given)}`);
-    lines.push(`    // When: ${JSON.stringify(c.when)}`);
-    lines.push(`    // Expect: ${JSON.stringify(c.expect)}`);
-    lines.push(`    // Required fakes: ${JSON.stringify(c.fake_dependencies??[])}`);
-    lines.push('    expect(true).toBe(true); // TODO: bind generated fixture and executable assertion');
-    lines.push('  });');
+    if((c.unsupported??[]).length){lines.push(`  it.todo(${JSON.stringify(`${c.id} — ${(c.unsupported??[]).join('; ')}`)});`);continue;}
+    if(c.target_kind==='guard'){
+      const hit=(root.use_cases??[]).find(u=>(u.guards??[]).some(g=>g.semantic_ref===c.target_id)),guard=hit?.guards?.find(g=>g.semantic_ref===c.target_id),refs=entityRefsForExpr(guard?.expression,maps);lines.push(`  it(${JSON.stringify(c.id)}, () => {`);const fixture={given:c.given,fixture_constraints:[]};for(const l of fixtureAssignments(fixture,{input_refs:refs},root,maps))lines.push(`    ${l}`);lines.push(`    expect(${guardName(c.target_id)}({ ${refs.map(r=>property(maps.entities.get(r)?.slot)).join(', ')} })).toBe(${JSON.stringify(c.expect?.rule_result)});`);lines.push('  });');continue;
+    }
+    if(c.target_kind==='use_case'){
+      const uc=(root.use_cases??[]).find(u=>u.id===c.use_case_id);if(!uc){lines.push(`  it.todo(${JSON.stringify(`${c.id} — missing use case`)});`);continue;}lines.push(`  it(${JSON.stringify(c.id)}, async () => {`);for(const l of fixtureAssignments(c,uc,root,maps))lines.push(`    ${l}`);const fake=fakeLines(uc,root,maps);for(const l of fake.lines)lines.push(`    ${l}`);lines.push(`    const useCase = new ${useCaseName(uc)}(${fake.args.join(', ')});`);lines.push(`    await useCase.execute({ ${(uc.input_refs??[]).map(r=>property(maps.entities.get(r)?.slot)).join(', ')} });`);for(const [ref,val] of Object.entries(c.expect??{})){const b=maps.bindings.get(ref);if(!b)continue;const entity=maps.entities.get(b.entity_ref),field=entity?.fields?.find(x=>x.semantic_ref===ref),en=field?maps.enums.get(field.type_ref):null,expected=en?`${en.tsName}.${pascal(val)}`:JSON.stringify(val);lines.push(`    expect(${accessRef(ref,maps,'') .replace(/^\./,'')}).toBe(${expected});`);}lines.push('  });');
+    }
   }
-  lines.push('});','');
-  return lines.join('\n');
+  lines.push('});','');return lines.join('\n');
 }
+function sqliteSource(root){const lines=['// Code generated by logic-engineering. DO NOT EDIT.','// SQLite adapter boundary. SQL/schema details require explicit IIR persistence mapping.',''];for(const repo of root.repository_contracts??[])lines.push(`// TODO: implement ${repo.id} using SQLite mapping for ${repo.entity_ref}.`);lines.push('');return lines.join('\n');}
+function packageSource(){return JSON.stringify({name:'logic-engineering-generated',private:true,type:'module',scripts:{typecheck:'tsc --noEmit',test:'vitest run'},devDependencies:{typescript:'^5.0.0',vitest:'^2.0.0'}},null,2)+'\n';}
+function tsconfigSource(){return JSON.stringify({compilerOptions:{target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',strict:true,noEmit:true,skipLibCheck:true},include:['domain/**/*.ts','ports/**/*.ts','errors/**/*.ts','rules/**/*.ts','usecases/**/*.ts','adapters/**/*.ts','tests/**/*.ts']},null,2)+'\n';}
 
-function sqliteSource(root){
-  const lines=['// Code generated by logic-engineering. DO NOT EDIT.','// SQLite adapter boundary. SQL is intentionally not guessed without explicit IIR mapping.',''];
-  for(const repo of root.repository_contracts??[]) lines.push(`// TODO: bind ${repo.id} to an explicit SQLite table/column mapping.`);
-  lines.push('');
-  return lines.join('\n');
-}
-
-const [iirFile,testPlanFile,...args]=process.argv.slice(2);
-const oi=args.indexOf('-o')>=0?args.indexOf('-o'):args.indexOf('--output-dir');
-const output=oi>=0?args[oi+1]:null;
+const [iirFile,testPlanFile,...args]=process.argv.slice(2);const oi=args.indexOf('-o')>=0?args.indexOf('-o'):args.indexOf('--output-dir');const output=oi>=0?args[oi+1]:null;
 if(!iirFile||!testPlanFile||!output){console.error('usage: node generate_typescript.mjs iir.json target-test-plan.json -o generated-ts');process.exit(2);}
-
 try{
-  const iir=readJson(iirFile),plan=readJson(testPlanFile),root=iir.iir??iir;
-  if(!['typescript','ts'].includes(String(root.target_profile?.language??'').toLowerCase())) throw new Error('Target Profile language 必须是 TypeScript');
-  if(String(root.target_profile?.persistence??'').toLowerCase()!=='sqlite') throw new Error('首个 Reference Target persistence 必须是 SQLite');
-  const unresolved=blockers(root); if(unresolved.length) throw new Error(`IIR 存在 blocking unresolved: ${JSON.stringify(unresolved)}`);
-  fs.mkdirSync(output,{recursive:true}); const artifacts=[];
-  const allPorts=[...(root.repository_contracts??[]),...(root.external_ports??[])];
-  if(allPorts.length) put(output,'ports/generated.ts',portsSource(root),allPorts.map(x=>x.id),artifacts);
+  const iir=readJson(iirFile),plan=readJson(testPlanFile),root=iir.iir??iir,maps=domainMaps(root);
+  if(!['typescript','ts'].includes(String(root.target_profile?.language??'').toLowerCase()))throw new Error('Target Profile language 必须是 TypeScript');
+  if(String(root.target_profile?.persistence??'').toLowerCase()!=='sqlite')throw new Error('首个 Reference Target persistence 必须是 SQLite');
+  const unresolved=blockers(root);if(unresolved.length)throw new Error(`IIR 存在 blocking unresolved: ${JSON.stringify(unresolved)}`);
+  fs.mkdirSync(output,{recursive:true});const artifacts=[];
+  put(output,'domain/generated.ts',domainSource(root,maps),[...maps.enums.keys(),...maps.entities.keys()],artifacts);
+  put(output,'ports/generated.ts',portsSource(root,maps),[...(root.repository_contracts??[]),...(root.external_ports??[])].map(x=>x.id),artifacts);
   put(output,'errors/generated.ts',errorsSource(root),(root.error_mappings??[]).map(x=>x.semantic_error_ref),artifacts);
-  put(output,'usecases/generated.ts',usecasesSource(root),(root.use_cases??[]).map(x=>x.semantic_id),artifacts);
+  put(output,'rules/generated.ts',rulesSource(root,maps),(root.use_cases??[]).flatMap(x=>(x.guards??[]).map(g=>g.semantic_ref)),artifacts);
+  put(output,'usecases/generated.ts',usecasesSource(root,maps),(root.use_cases??[]).map(x=>x.semantic_refs?.[0]),artifacts);
   put(output,'adapters/sqlite.ts',sqliteSource(root),(root.repository_contracts??[]).map(x=>x.id),artifacts);
-  put(output,'tests/generated.test.ts',testsSource(plan),[],artifacts);
-  const manifest={generator:'typescript-v0.1',source_clm:root.source_clm_id,source_semantic_hash:root.source_semantic_hash,iir_version:root.version,target_profile:root.target_profile?.id,artifacts};
-  writeJson(path.join(output,'manifest.json'),manifest);
-  console.log(JSON.stringify({ok:true,output_dir:output,artifacts:artifacts.length},null,2));
+  put(output,'tests/generated.test.ts',testsSource(root,plan,maps),(plan.target_test_plan??plan).cases?.map(x=>x.source_semantic_id)??[],artifacts);
+  put(output,'package.json',packageSource(),[],artifacts);put(output,'tsconfig.json',tsconfigSource(),[],artifacts);
+  const manifest={generator:'typescript-v0.2-executable',source_clm:root.source_clm_id,source_semantic_hash:root.source_semantic_hash,iir_version:root.version,target_profile:root.target_profile?.id,artifacts};writeJson(path.join(output,'manifest.json'),manifest);
+  console.log(JSON.stringify({ok:true,output_dir:output,artifacts:artifacts.length,executable_tests:(plan.target_test_plan??plan).summary?.executable??0},null,2));
 }catch(e){console.error(JSON.stringify({ok:false,error:e.message},null,2));process.exit(1);}
