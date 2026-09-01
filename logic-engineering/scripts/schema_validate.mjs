@@ -47,12 +47,10 @@ function validateNode(value,schema,root,path,errors,{probe=false}={}){
 
   if(Array.isArray(schema.oneOf)){
     let matched=0;
-    const branchErrors=[];
     for(const sub of schema.oneOf){
       const local=[];
       validateNode(value,sub,root,path,local,{probe:true});
       if(local.length===0) matched++;
-      branchErrors.push(local);
     }
     if(matched!==1){
       errors.push({code:'SCHEMA_VALIDATION_ERROR',path,message:`oneOf 必须且只能匹配一个分支，实际匹配 ${matched} 个`});
@@ -113,6 +111,11 @@ function validateNode(value,schema,root,path,errors,{probe=false}={}){
   }
 
   if(value!==null && typeof value==='object' && !Array.isArray(value)){
+    const keys=Object.keys(value);
+    if(Number.isInteger(schema.minProperties) && keys.length<schema.minProperties)
+      errors.push({code:'SCHEMA_VALIDATION_ERROR',path,message:`对象属性数量必须 >= ${schema.minProperties}`});
+    if(Number.isInteger(schema.maxProperties) && keys.length>schema.maxProperties)
+      errors.push({code:'SCHEMA_VALIDATION_ERROR',path,message:`对象属性数量必须 <= ${schema.maxProperties}`});
     for(const req of schema.required??[]){
       if(!(req in value)) errors.push({code:'SCHEMA_VALIDATION_ERROR',path,message:`缺少必需字段: ${req}`});
     }
@@ -122,12 +125,12 @@ function validateNode(value,schema,root,path,errors,{probe=false}={}){
     }
     if(schema.additionalProperties===false){
       const allowed=new Set(Object.keys(props));
-      for(const key of Object.keys(value)){
+      for(const key of keys){
         if(!allowed.has(key)) errors.push({code:'SCHEMA_VALIDATION_ERROR',path:`${path}/${escapePointer(key)}`,message:`不允许额外字段: ${key}`});
       }
     }else if(schema.additionalProperties && typeof schema.additionalProperties==='object'){
       const allowed=new Set(Object.keys(props));
-      for(const key of Object.keys(value)){
+      for(const key of keys){
         if(!allowed.has(key)) validateNode(value[key],schema.additionalProperties,root,`${path}/${escapePointer(key)}`,errors,{probe});
       }
     }
