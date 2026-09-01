@@ -9,11 +9,11 @@ function collectRefs(v,out=new Set()){if(Array.isArray(v))for(const x of v)colle
 function compileDomain(root){
   const enums=[],entities=[],runtime=[];
   for(const node of root.domain??[]){
-    if(node.kind==='enum') enums.push({semantic_ref:node.id,name:node.name??pascal(node.id.replace(/^domain\./,'')),values:[...(node.values??[])]});
+    if(node.kind==='enum') enums.push({semantic_ref:node.id,name:pascal(node.id.replace(/^domain\./,'')),display_name:node.name??null,values:[...(node.values??[])]});
     if(node.kind==='entity'){
       const slot=camel(node.id.replace(/^domain\./,''));
       const fields=(node.fields??[]).map(f=>({semantic_ref:f.id,name:String(f.id).split('.').at(-1),type_ref:f.type,nullable:f.nullable??false,cardinality:f.cardinality??'one'}));
-      entities.push({semantic_ref:node.id,name:node.name??pascal(node.id.replace(/^domain\./,'')),slot,fields});
+      entities.push({semantic_ref:node.id,name:pascal(node.id.replace(/^domain\./,'')),display_name:node.name??null,slot,fields});
       runtime.push({semantic_ref:node.id,kind:'entity',slot});
       for(const f of fields) runtime.push({semantic_ref:f.semantic_ref,kind:'field',entity_ref:node.id,slot,path:[f.name]});
     }
@@ -74,12 +74,12 @@ function compileUseCases(root,index,repositories,ports,unresolved){
     const inputEntities=[...new Set([...refs].map(entityOfField).filter(Boolean))];
     const effectIds=new Set(steps.flatMap(s=>s.effects??[]));
     const dependencies=[...repositories.filter(x=>x.semantic_refs.some(r=>effectIds.has(r))).map(x=>x.id),...ports.filter(x=>x.semantic_refs.some(r=>effectIds.has(r))).map(x=>x.id)];
-    use_cases.push({id:`usecase.${b.id.replace(/^behavior\./,'')}`,kind:'use_case',semantic_refs:[b.id],name:b.name??b.id,input_refs:inputEntities,inputs:inputEntities,guards,steps,outputs:b.outputs??[],failure_refs:b.failures??[],postconditions:b.postconditions??[],dependencies});
+    use_cases.push({id:`usecase.${b.id.replace(/^behavior\./,'')}`,kind:'use_case',semantic_refs:[b.id],name:pascal(b.id.replace(/^behavior\./,'')),display_name:b.name??null,input_refs:inputEntities,inputs:inputEntities,guards,steps,outputs:b.outputs??[],failure_refs:b.failures??[],postconditions:b.postconditions??[],dependencies});
   }
   return use_cases;
 }
 
-function compileErrors(root,index){
+function compileErrors(root){
   const refs=new Set();for(const b of root.behaviors??[])for(const x of b.failures??[])refs.add(x);for(const r of root.rules??[])if(r.failure)refs.add(r.failure);
   return [...refs].map(ref=>({id:`error_mapping.${ref.replace(/^error\./,'')}`,semantic_error_ref:ref,target_error:`${pascal(ref.replace(/^error\./,''))}Error`}));
 }
@@ -91,7 +91,7 @@ function compile(clm,profile){
   for(const repo of repositories){repo.binding.provider=profile.persistence??null;if(!profile.persistence)unresolved.push({semantic_ref:repo.entity_ref,reason:'Target Profile 缺少 persistence provider',required_for:repo.id,severity:'blocking'});}
   const plans=compilePlans(root,profile,unresolved);
   const use_cases=compileUseCases(root,index,repositories,ports,unresolved);
-  const error_mappings=compileErrors(root,index);
+  const error_mappings=compileErrors(root);
   const generation_regions=[...use_cases.map(u=>({id:`region.${u.id}`,mode:'generated',semantic_refs:u.semantic_refs})),...repositories.map(r=>({id:`region.${r.id}`,mode:'contract_only',semantic_refs:r.semantic_refs.length?r.semantic_refs:[r.entity_ref]})),...ports.map(p=>({id:`region.${p.id}`,mode:p.generation_mode,semantic_refs:p.semantic_refs}))];
   const traceability=use_cases.map(u=>({implementation_id:u.id,semantic_refs:[...u.semantic_refs,...u.guards.map(g=>g.semantic_ref),...u.steps.map(s=>s.semantic_ref)]}));
   return {iir:{version:'0.2',source_clm_id:root.id,source_clm_version:root.version,source_semantic_hash:semanticHash(clm),target_profile:profile,domain_types,runtime_bindings,use_cases,repository_contracts:repositories,external_ports:ports,...plans,error_mappings,primitive_bindings:[],generation_regions,traceability,unresolved}};
