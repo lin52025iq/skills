@@ -1,17 +1,26 @@
 # 规范逻辑模型（CLM）v0.2
 
-v0.2 的目标不是增加更多业务概念，而是让现有逻辑模型从“结构化 JSON”升级为更接近编译器 IR 的 **带类型语义模型**。
+CLM v0.2 是语言无关的 **带类型语义模型**。目标是让业务行为既能被人理解，又能被机器验证、修改和编译。
 
-## 1. v0.2 的四个核心变化
+## 1. 核心变化
 
-1. **统一节点注册表**：所有工具只认一份 `kind → collection` 映射。
-2. **Typed Expression AST**：条件和不变量不再优先保存为自由字符串。
-3. **Symbol Table**：字段、枚举和值类型都能被解析和类型检查。
-4. **兼容迁移**：v0.1 仍可读，但 Validator 会给出迁移 warning。
+```text
+统一 Node Registry
+Typed Value / Typed Expression AST
+Symbol Table
+Typed Action
+Typed Scenario
+Semantic Patch / Change Set
+Semantic Hash
+```
 
-## 2. 统一节点集合
+机器公共实现以：
 
-规范集合：
+`scripts/lib/model.mjs`
+
+为统一 Node Registry、Symbol Table 和 Semantic Hash 基础。禁止各工具维护另一份节点集合。
+
+## 2. 节点集合
 
 ```text
 domain
@@ -26,30 +35,22 @@ scenarios
 primitives
 ```
 
-`relations` 与 `evidence` 是支持结构，不属于普通语义节点集合。
-
-机器实现以 `scripts/clm_model.py` 为唯一注册表。禁止各脚本自行维护 collection 列表。
+`relations` 与 `evidence` 是支持结构。
 
 ## 3. Domain 与 Symbol
 
-### Entity
+Entity：
 
 ```yaml
 id: domain.order
 kind: entity
-name: 订单
 fields:
   - id: domain.order.status
     type: domain.order_status
     nullable: false
-  - id: domain.order.paid_amount
-    type: type.money
-    nullable: false
 ```
 
-Entity field 本身进入 Symbol Table，但不要求在 `domain` 顶层重复成为独立节点。
-
-### Enum
+Enum：
 
 ```yaml
 id: domain.order_status
@@ -61,33 +62,31 @@ values:
   - CANCELLED
 ```
 
-### Value Type
+Value Type：
 
 ```yaml
 id: type.money
 kind: value_type
 base_type: number
-constraints:
-  - constraint.money.non_negative
 ```
+
+Entity field 会进入 Symbol Table，不需要在 `domain` 顶层重复建节点。
 
 ## 4. Typed Value
 
-表达式中不直接写不可区分的字符串，而使用 typed value：
-
-### Symbol Reference
+Symbol Reference：
 
 ```yaml
 ref: domain.order.status
 ```
 
-### Literal
+Literal：
 
 ```yaml
 literal: 100
 ```
 
-### Enum Value
+Enum：
 
 ```yaml
 enum:
@@ -95,17 +94,29 @@ enum:
   value: PENDING_PAYMENT
 ```
 
-### Null
+Null：
 
 ```yaml
 null: true
 ```
 
-一个 typed value 必须且只能使用以上一种形式。
+集合：
 
-## 5. Typed Expression AST
+```yaml
+set:
+  - enum:
+      type: domain.order_status
+      value: PENDING_PAYMENT
+  - enum:
+      type: domain.order_status
+      value: PENDING_ACCEPTANCE
+```
 
-### 比较
+Typed Value 必须且只能使用一种形态。
+
+## 5. Typed Expression
+
+比较：
 
 ```yaml
 op: eq
@@ -117,188 +128,168 @@ right:
     value: PENDING_PAYMENT
 ```
 
-标准比较操作：
+标准操作：
 
 ```text
 eq ne lt le gt ge in not_in
+all any not
 ```
 
-### all
+集合判断：
 
 ```yaml
-op: all
-items:
-  - op: eq
-    left: { ref: domain.order.owner_id }
-    right: { ref: domain.current_user.id }
-  - op: in
-    left: { ref: domain.order.status }
-    right:
-      literal:
-        - PENDING_PAYMENT
-        - PENDING_ACCEPTANCE
+op: in
+left:
+  ref: domain.order.status
+right:
+  set:
+    - enum: { type: domain.order_status, value: PENDING_PAYMENT }
+    - enum: { type: domain.order_status, value: PENDING_ACCEPTANCE }
 ```
 
-### any
+`in / not_in` 右侧必须使用 typed `set`，不能退回自由字符串数组。
 
-```yaml
-op: any
-items:
-  - ...
-  - ...
-```
-
-### not
-
-```yaml
-op: not
-item:
-  op: eq
-  left: { ref: domain.order.status }
-  right:
-    enum:
-      type: domain.order_status
-      value: CANCELLED
-```
-
-## 6. Rule v0.2
-
-推荐：
+## 6. Rule
 
 ```yaml
 id: rule.order.cancel.allowed_status
 kind: rule
-name: 允许取消的订单状态
 expression:
   op: in
-  left:
-    ref: domain.order.status
+  left: { ref: domain.order.status }
   right:
-    literal:
-      - PENDING_PAYMENT
-      - PENDING_ACCEPTANCE
-failure: error.order.cancel_forbidden
+    set:
+      - enum: { type: domain.order_status, value: PENDING_PAYMENT }
+      - enum: { type: domain.order_status, value: PENDING_ACCEPTANCE }
 ```
 
-v0.1：
-
-```yaml
-subject: domain.order.status
-operator: in
-value:
-  - PENDING_PAYMENT
-  - PENDING_ACCEPTANCE
-```
-
-仍可暂时读取，但 Validator 输出 `LEGACY_RULE_SHAPE`。
-
-## 7. Decision v0.2
+## 7. Decision
 
 ```yaml
 id: decision.order.cancel.refund
 kind: decision
 when:
   op: eq
-  left:
-    ref: domain.payment.status
+  left: { ref: domain.payment.status }
   right:
-    enum:
-      type: domain.payment_status
-      value: SUCCEEDED
+    enum: { type: domain.payment_status, value: SUCCEEDED }
 then:
   - action.payment.create_refund
 else: []
 ```
 
-## 8. Constraint v0.2
+## 8. Typed Action
+
+```yaml
+id: action.order.cancel.change_status
+kind: action
+operation: assign
+target:
+  ref: domain.order.status
+value:
+  enum:
+    type: domain.order_status
+    value: CANCELLED
+```
+
+赋值两侧必须通过类型检查。
+
+## 9. Typed Scenario
+
+```yaml
+id: scenario.order.cancel.pending
+kind: scenario
+given:
+  - target: { ref: domain.order.status }
+    value:
+      enum: { type: domain.order_status, value: PENDING_PAYMENT }
+when:
+  - behavior.order.cancel
+then:
+  - target: { ref: domain.order.status }
+    value:
+      enum: { type: domain.order_status, value: CANCELLED }
+```
+
+Scenario 是 executable example，不重新定义 CLM 规则。
+
+## 10. Constraint
 
 ```yaml
 id: invariant.order.refund_not_exceed_payment
 kind: invariant
 expression:
   op: le
-  left:
-    ref: domain.order.total_refunded
-  right:
-    ref: domain.order.paid_amount
+  left: { ref: domain.order.total_refunded }
+  right: { ref: domain.order.paid_amount }
 ```
 
-这允许 Validator 判断两侧是否同为 `Money`。
+## 11. Symbol Table
 
-## 9. Symbol Table
+生成：
 
-`scripts/symbol_table.py` 生成：
-
-```json
-{
-  "symbols": {
-    "domain.order.status": {
-      "kind": "field",
-      "type": "domain.order_status",
-      "nullable": false,
-      "owner": "domain.order"
-    }
-  }
-}
+```bash
+node scripts/logic_cli.mjs symbols model.json -o symbols.json
 ```
 
-Symbol Table 是以下能力的共同基础：
+用于：
 
 - 引用检查；
 - enum value 检查；
-- 类型兼容检查；
-- 边界测试生成；
-- 自然语言投影；
+- 类型兼容；
+- 测试派生；
+- 中文投影；
 - IIR 编译；
-- Formal Projection。
+- 后续 Formal Projection。
 
-## 10. 类型校验原则
+## 12. 校验
 
-至少检查：
+结构 Gate：
 
-```text
-Money <= Money             合法
-integer < number           合法
-OrderStatus == OrderStatus 合法
-Money == OrderStatus       非法
+```bash
+node scripts/schema_validate.mjs model.json schemas/clm-v0.2.schema.json
 ```
 
-Enum literal 必须属于声明 enum：
+语义 Gate：
 
-```text
-PENDING_PAYMENT ∈ domain.order_status  合法
-UNKNOWN_STATE   ∈ domain.order_status  非法
+```bash
+node scripts/logic_cli.mjs validate-clm model.json
 ```
 
-## 11. v0.1 兼容策略
-
-v0.2 不要求一次性破坏所有既有 fixture。
-
-Validator 对旧形态：
+至少保证：
 
 ```text
-subject/operator/value
-all.args
-any.args
-not.arg
+Semantic ID 唯一
+Node collection 正确
+引用存在
+enum type/value 合法
+assign 类型兼容
+Scenario 类型兼容
+状态迁移不冲突
+observed evidence 满足要求
 ```
 
-先输出迁移 warning，而不是直接阻断。
+## 13. v0.1 兼容
 
-新写入的 canonical CLM 应优先使用 v0.2。
+v0.1 只保留兼容读取与迁移能力，不再扩展新功能。
 
-## 12. Canonical Gate 增强
+```bash
+node scripts/migrate_clm_v01_to_v02.mjs old.json -o new.json
+```
 
-节点进入 canonical 前，v0.2 推荐额外要求：
+迁移脚本只做确定性结构转换，不猜测缺失业务含义。
+
+## 14. Canonical Gate
+
+进入 canonical 前至少要求：
 
 ```text
-所有表达式可解析
-所有 symbol reference 存在
-enum literal 有效
-类型比较兼容
-没有 NODE_COLLECTION_MISMATCH
-没有 UNKNOWN_SYMBOL
-没有 TYPE_MISMATCH
+Schema valid
+Semantic valid
+所有关键引用可解析
+所有 Typed Expression 可检查
+无关键状态冲突
+Legacy observed facts 有足够 Evidence
 ```
 
-Legacy candidate 可以暂时保留 warning，但在生成生产实现前应消除。
+CLM v0.2 结构若发生破坏性变化，应升级版本，不静默重定义 v0.2。
