@@ -15,16 +15,8 @@
         "kind": "entity",
         "name": "订单",
         "fields": [
-          {
-            "id": "domain.order.status",
-            "type": "domain.order_status",
-            "nullable": false
-          },
-          {
-            "id": "domain.order.owner_id",
-            "type": "string",
-            "nullable": false
-          }
+          { "id": "domain.order.status", "type": "domain.order_status", "nullable": false },
+          { "id": "domain.order.owner_id", "type": "string", "nullable": false }
         ]
       },
       {
@@ -32,11 +24,7 @@
         "kind": "entity",
         "name": "当前用户",
         "fields": [
-          {
-            "id": "domain.current_user.id",
-            "type": "string",
-            "nullable": false
-          }
+          { "id": "domain.current_user.id", "type": "string", "nullable": false }
         ]
       }
     ],
@@ -45,16 +33,9 @@
         "id": "behavior.order.cancel",
         "kind": "behavior",
         "name": "取消订单",
-        "preconditions": [
-          "rule.order.cancel.owner",
-          "rule.order.cancel.allowed_status"
-        ],
-        "flow": [
-          "action.order.cancel.change_status"
-        ],
-        "postconditions": [
-          "invariant.order.cancelled"
-        ]
+        "preconditions": ["rule.order.cancel.owner", "rule.order.cancel.allowed_status"],
+        "flow": ["action.order.cancel.change_status"],
+        "postconditions": ["invariant.order.cancelled"]
       }
     ],
     "rules": [
@@ -76,7 +57,10 @@
           "op": "in",
           "left": { "ref": "domain.order.status" },
           "right": {
-            "literal": ["PENDING_PAYMENT", "PENDING_ACCEPTANCE"]
+            "set": [
+              { "enum": { "type": "domain.order_status", "value": "PENDING_PAYMENT" } },
+              { "enum": { "type": "domain.order_status", "value": "PENDING_ACCEPTANCE" } }
+            ]
           }
         }
       }
@@ -88,13 +72,8 @@
         "kind": "action",
         "name": "修改订单状态",
         "operation": "assign",
-        "target": "domain.order.status",
-        "value": {
-          "enum": {
-            "type": "domain.order_status",
-            "value": "CANCELLED"
-          }
-        },
+        "target": { "ref": "domain.order.status" },
+        "value": { "enum": { "type": "domain.order_status", "value": "CANCELLED" } },
         "effects": ["effect.order.status_write"]
       }
     ],
@@ -114,16 +93,30 @@
         "expression": {
           "op": "eq",
           "left": { "ref": "domain.order.status" },
-          "right": {
-            "enum": {
-              "type": "domain.order_status",
-              "value": "CANCELLED"
-            }
-          }
+          "right": { "enum": { "type": "domain.order_status", "value": "CANCELLED" } }
         }
       }
     ],
-    "scenarios": [],
+    "scenarios": [
+      {
+        "id": "scenario.order.cancel.pending_payment",
+        "kind": "scenario",
+        "name": "取消待支付订单",
+        "given": [
+          {
+            "target": { "ref": "domain.order.status" },
+            "value": { "enum": { "type": "domain.order_status", "value": "PENDING_PAYMENT" } }
+          }
+        ],
+        "when": ["behavior.order.cancel"],
+        "then": [
+          {
+            "target": { "ref": "domain.order.status" },
+            "value": { "enum": { "type": "domain.order_status", "value": "CANCELLED" } }
+          }
+        ]
+      }
+    ],
     "primitives": [],
     "relations": [],
     "evidence": []
