@@ -10,6 +10,7 @@ function run(script,args,label){const p=spawnSync(process.execPath,[path.join(DI
 function assertCheck(label,ok){return{label,ok,returncode:ok?0:1,stdout:'',stderr:''}}
 
 const model=path.join(FIX,'order-cancel.v0.2.valid.json'),profile=path.join(FIX,'ts-sqlite.target-profile.json'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'logic-sqlite-reg-')),checks=[];
+checks.push(run('schema_validate.mjs',[profile,path.join(SCHEMAS,'target-profile-v0.1.schema.json')],'Target Profile Schema'));
 checks.push(run('logic_cli.mjs',['test-vectors',model,'-o',path.join(tmp,'tests.json')],'生成测试向量'));
 checks.push(run('compile_iir.mjs',[model,profile,'-o',path.join(tmp,'iir.json')],'编译 SQLite IIR'));
 checks.push(run('schema_validate.mjs',[path.join(tmp,'iir.json'),path.join(SCHEMAS,'iir-v0.2.schema.json')],'SQLite IIR Schema'));
