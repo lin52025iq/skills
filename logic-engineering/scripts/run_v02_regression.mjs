@@ -5,8 +5,10 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {readJson} from './lib/model.mjs';
 const DIR=path.dirname(new URL(import.meta.url).pathname),ROOT=path.resolve(DIR,'..'),FIX=path.join(ROOT,'evals','fixtures'),SCHEMAS=path.join(ROOT,'schemas');
-function run(script,args,label){const p=spawnSync(process.execPath,[path.join(DIR,script),...args],{encoding:'utf8'});return {label,ok:p.status===0,returncode:p.status,stdout:(p.stdout??'').slice(-1500),stderr:(p.stderr??'').slice(-1500)}}
-const model=path.join(FIX,'order-cancel.v0.2.valid.json'),profile=path.join(FIX,'ts-sqlite.target-profile.json'),change=path.join(FIX,'order-cancel.add-paid.change-set.json'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'logic-v02-reg-')),checks=[];
+function run(script,args,label){const p=spawnSync(process.execPath,[path.join(DIR,script),...args],{encoding:'utf8'});return{label,ok:p.status===0,returncode:p.status,stdout:(p.stdout??'').slice(-1500),stderr:(p.stderr??'').slice(-1500)}}
+function assertCheck(label,ok){return{label,ok,returncode:ok?0:1,stdout:'',stderr:''}}
+const model=path.join(FIX,'order-cancel.v0.2.valid.json'),decisionModel=path.join(FIX,'order-routing.decision.v0.2.json'),profile=path.join(FIX,'ts-sqlite.target-profile.json'),change=path.join(FIX,'order-cancel.add-paid.change-set.json'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'logic-v02-reg-')),checks=[];
+
 checks.push(run('schema_validate.mjs',[model,path.join(SCHEMAS,'clm-v0.2.schema.json')],'CLM Schema'));
 checks.push(run('logic_cli.mjs',['validate-clm',model],'CLM Semantic'));
 checks.push(run('logic_cli.mjs',['render',model,'-o',path.join(tmp,'human.md')],'中文逻辑投影'));
@@ -26,7 +28,28 @@ checks.push(run('logic_cli.mjs',['validate-clm',path.join(tmp,'changed.json')],'
 checks.push(run('run_pipeline.mjs',[model,'--change-set',change,'--target-profile',profile,'--generate-ts','--output-dir',path.join(tmp,'pipeline')],'端到端 Node 流水线'));
 let scenario=false,domainTypes=false,planExecutable=false;
 try{scenario=(readJson(path.join(tmp,'tests.json')).vectors??[]).some(v=>v.kind==='scenario'&&v.given&&v.expect);const iir=readJson(path.join(tmp,'iir.json')).iir;domainTypes=Array.isArray(iir?.domain_types?.enums)&&Array.isArray(iir?.runtime_bindings);const plan=readJson(path.join(tmp,'target-tests.json')).target_test_plan;planExecutable=(plan?.summary?.executable??0)>=1}catch{}
-checks.push({label:'Typed Scenario 标准测试向量',ok:scenario,returncode:scenario?0:1,stdout:'',stderr:''});
-checks.push({label:'IIR Runtime Bindings',ok:domainTypes,returncode:domainTypes?0:1,stdout:'',stderr:''});
-checks.push({label:'Target Test Plan 可执行 case',ok:planExecutable,returncode:planExecutable?0:1,stdout:'',stderr:''});
+checks.push(assertCheck('Typed Scenario 标准测试向量',scenario));
+checks.push(assertCheck('IIR Runtime Bindings',domainTypes));
+checks.push(assertCheck('Target Test Plan 可执行 case',planExecutable));
+
+const decisionDir=path.join(tmp,'decision');fs.mkdirSync(decisionDir,{recursive:true});
+checks.push(run('schema_validate.mjs',[decisionModel,path.join(SCHEMAS,'clm-v0.2.schema.json')],'Decision CLM Schema'));
+checks.push(run('logic_cli.mjs',['validate-clm',decisionModel],'Decision CLM Semantic'));
+checks.push(run('logic_cli.mjs',['test-vectors',decisionModel,'-o',path.join(decisionDir,'tests.json')],'Decision 测试向量'));
+checks.push(run('compile_iir.mjs',[decisionModel,profile,'-o',path.join(decisionDir,'iir.json')],'Decision IIR 编译'));
+checks.push(run('schema_validate.mjs',[path.join(decisionDir,'iir.json'),path.join(SCHEMAS,'iir-v0.2.schema.json')],'Decision IIR Schema'));
+checks.push(run('logic_cli.mjs',['validate-iir',path.join(decisionDir,'iir.json')],'Decision IIR Semantic'));
+checks.push(run('compile_target_tests.mjs',[path.join(decisionDir,'tests.json'),path.join(decisionDir,'iir.json'),'-o',path.join(decisionDir,'target-tests.json')],'Decision Target Test Plan'));
+checks.push(run('generate_typescript_v02.mjs',[path.join(decisionDir,'iir.json'),path.join(decisionDir,'target-tests.json'),'-o',path.join(decisionDir,'generated-ts')],'Decision TypeScript 生成'));
+checks.push(run('validate_generated_typescript.mjs',[path.join(decisionDir,'generated-ts')],'Decision TypeScript 质量'));
+let decisionExpanded=false,ifElse=false,decisionTests=false;
+try{
+  const iir=readJson(path.join(decisionDir,'iir.json')).iir,step=iir.use_cases?.[0]?.steps?.[0];decisionExpanded=step?.kind==='decision'&&step.then_steps?.[0]?.semantic_ref==='action.order.route.fast'&&step.else_steps?.[0]?.semantic_ref==='action.order.route.standard';
+  const source=fs.readFileSync(path.join(decisionDir,'generated-ts','usecases','generated.ts'),'utf8');ifElse=source.includes('if (')&&source.includes('} else {')&&source.includes(' = "FAST";')&&source.includes(' = "STANDARD";');
+  const plan=readJson(path.join(decisionDir,'target-tests.json')).target_test_plan;decisionTests=plan.summary?.executable===2;
+}catch{}
+checks.push(assertCheck('IIR Decision 展开 then/else',decisionExpanded));
+checks.push(assertCheck('TypeScript Decision 生成 if/else',ifElse));
+checks.push(assertCheck('Decision 两个 Scenario 可执行',decisionTests));
+
 const ok=checks.every(x=>x.ok);console.log(JSON.stringify({ok,checks},null,2));fs.rmSync(tmp,{recursive:true,force:true});process.exit(ok?0:1);
