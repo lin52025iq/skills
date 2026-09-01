@@ -21,6 +21,7 @@
     },
     "messaging": "none",
     "transaction_strategy": "sqlite_transaction",
+    "transaction_scope": "full_behavior",
     "error_model": "typed_errors",
     "test_framework": "Vitest",
     "binding_key": "ts-sqlite"
