@@ -21,8 +21,29 @@ export function buildSymbolTable(doc){const table={};for(const [collection,node]
 export function resolveType(symbols,id){return symbols[id]?.type??null;}
 export function enumContains(symbols,type,value){return (symbols[type]?.enum_values??[]).includes(value);}
 export function compatibleTypes(a,b){if(a==null||b==null||a===b)return true;return ['integer','number'].includes(a)&&['integer','number'].includes(b);}
+export function entityFieldSymbol(symbols,entityType,fieldPath){const first=Array.isArray(fieldPath)?fieldPath[0]:String(fieldPath).split('.')[0];if(!first)return null;return symbols[`${entityType}.${first}`]??null;}
+export function resolveScopedRef(ref,scope,symbols){
+  if(typeof ref!=='string'||!scope?.alias||!scope?.entityType)return null;
+  if(ref===scope.alias)return {kind:'item',type:scope.entityType,entityType:scope.entityType,path:[]};
+  if(!ref.startsWith(`${scope.alias}.`))return null;
+  const tail=ref.slice(scope.alias.length+1).split('.').filter(Boolean);
+  if(!tail.length)return null;
+  const field=entityFieldSymbol(symbols,scope.entityType,tail);
+  if(!field)return null;
+  return {kind:'item_field',type:field.type,entityType:scope.entityType,path:tail,cardinality:field.cardinality??'one',nullable:field.nullable??false};
+}
+export function collectionElementScope(collectionValue,itemAlias,symbols){
+  const ref=collectionValue?.ref;
+  if(typeof ref!=='string')return {valid:false,reason:'foreach.collection 必须引用集合字段'};
+  const symbol=symbols[ref];
+  if(!symbol)return {valid:false,reason:`foreach.collection 引用未知 symbol: ${ref}`};
+  if(symbol.cardinality!=='many')return {valid:false,reason:`foreach.collection 必须 cardinality=many: ${ref}`};
+  if(typeof symbol.type!=='string'||!symbols[symbol.type]||symbols[symbol.type].kind!=='entity')return {valid:false,reason:`foreach.collection 元素类型必须是 entity: ${symbol.type??'<missing>'}`};
+  if(typeof itemAlias!=='string'||!itemAlias.trim())return {valid:false,reason:'foreach.item 必须是非空别名'};
+  return {valid:true,alias:itemAlias,entityType:symbol.type,collectionRef:ref};
+}
 export function canonicalSemanticPayload(doc){const clone=structuredClone(rootOf(doc));delete clone.evidence;delete clone.notes;const scrub=v=>{if(Array.isArray(v))return v.map(scrub);if(v&&typeof v==='object'){const o={};for(const k of Object.keys(v).sort()){if(['confidence','evidence_refs','notes'].includes(k))continue;o[k]=scrub(v[k]);}return o;}return v;};return scrub(clone);}
 export function semanticHash(doc){return crypto.createHash('sha256').update(JSON.stringify(canonicalSemanticPayload(doc))).digest('hex');}
 export function unwrapValue(v){if(!v||typeof v!=='object')return v;if('literal'in v)return v.literal;if(v.enum&&typeof v.enum==='object')return v.enum.value;if(v.null)return null;if(Array.isArray(v.set))return v.set.map(unwrapValue);if(typeof v.ref==='string')return {ref:v.ref};return v;}
 export function valueRef(v){return v&&typeof v==='object'&&typeof v.ref==='string'?v.ref:null;}
-export function valueType(v,symbols){if(!v||typeof v!=='object')return null;if(v.ref)return resolveType(symbols,v.ref);if(v.enum)return v.enum.type??null;if('literal'in v){if(typeof v.literal==='boolean')return'boolean';if(Number.isInteger(v.literal))return'integer';if(typeof v.literal==='number')return'number';if(typeof v.literal==='string')return'string';}return null;}
+export function valueType(v,symbols,scope=null){if(!v||typeof v!=='object')return null;if(v.ref){const scoped=resolveScopedRef(v.ref,scope,symbols);return scoped?.type??resolveType(symbols,v.ref);}if(v.enum)return v.enum.type??null;if('literal'in v){if(typeof v.literal==='boolean')return'boolean';if(Number.isInteger(v.literal))return'integer';if(typeof v.literal==='number')return'number';if(typeof v.literal==='string')return'string';}return null;}
