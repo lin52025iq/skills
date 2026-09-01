@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""运行最小逻辑工程流水线。
+"""运行逻辑工程最小流水线。
 
 流程：
 1. 校验原始 CLM
 2. 可选应用 Semantic Patch
 3. 校验更新后的 CLM
-4. 生成中文逻辑投影
-5. 可选编译 IIR
+4. 分析修改影响范围
+5. 生成中文逻辑投影
+6. 从 CLM 独立生成测试向量
+7. 可选编译 IIR
 
 该脚本通过调用同目录脚本实现，作为 Skill 的统一可执行入口。
 """
@@ -17,15 +19,14 @@ import argparse
 import json
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
-def run(cmd: List[str], label: str) -> None:
+def run(cmd: List[str], label: str) -> str:
     proc = subprocess.run(cmd, text=True, capture_output=True)
     if proc.returncode != 0:
         payload = {
@@ -39,6 +40,26 @@ def run(cmd: List[str], label: str) -> None:
         raise SystemExit(proc.returncode)
     if proc.stdout.strip():
         print(f"[{label}]\n{proc.stdout.strip()}")
+    return proc.stdout
+
+
+def load_json(path: Path) -> Dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def patch_changed_ids(path: Path) -> List[str]:
+    patch = load_json(path)
+    ids: List[str] = []
+    target = patch.get("target_semantic_id") or patch.get("target")
+    if isinstance(target, str):
+        ids.append(target)
+    for item in patch.get("changes", []) or []:
+        if isinstance(item, dict):
+            item_target = item.get("target_semantic_id") or item.get("target")
+            if isinstance(item_target, str):
+                ids.append(item_target)
+    # 保持顺序并去重
+    return list(dict.fromkeys(ids))
 
 
 def main() -> int:
@@ -64,7 +85,11 @@ def main() -> int:
         str(schema),
     ], "校验原始 CLM")
 
+    impact = None
+    changed_ids: List[str] = []
+
     if args.patch:
+        changed_ids = patch_changed_ids(args.patch)
         updated = out / "updated.clm.json"
         diff = out / "semantic-diff.json"
         run([
@@ -87,6 +112,17 @@ def main() -> int:
             str(schema),
         ], "校验更新后的 CLM")
 
+        if changed_ids:
+            impact = out / "impact-analysis.json"
+            run([
+                sys.executable,
+                str(SCRIPT_DIR / "analyze_impact.py"),
+                str(working_clm),
+                *changed_ids,
+                "--output",
+                str(impact),
+            ], "分析语义影响")
+
     human_logic = out / "human-logic.md"
     run([
         sys.executable,
@@ -95,6 +131,15 @@ def main() -> int:
         "-o",
         str(human_logic),
     ], "生成中文逻辑投影")
+
+    test_vectors = out / "test-vectors.json"
+    run([
+        sys.executable,
+        str(SCRIPT_DIR / "generate_test_vectors.py"),
+        str(working_clm),
+        "--output",
+        str(test_vectors),
+    ], "生成测试向量")
 
     iir = None
     if args.target_profile:
@@ -113,6 +158,8 @@ def main() -> int:
         "clm": str(working_clm),
         "human_logic": str(human_logic),
         "semantic_diff": str(out / "semantic-diff.json") if args.patch else None,
+        "impact_analysis": str(impact) if impact else None,
+        "test_vectors": str(test_vectors),
         "iir": str(iir) if iir else None,
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
