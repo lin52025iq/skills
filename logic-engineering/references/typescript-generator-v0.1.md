@@ -1,6 +1,6 @@
 # TypeScript 目标生成器 v0.1
 
-TypeScript Generator 只消费 **已经通过 IIR v0.2 校验** 的实现中间表示，不直接从 CLM 猜测技术实现。
+TypeScript Generator 是独立 Target Adapter，只消费 **已经通过 IIR v0.2 校验** 的实现中间表示，不直接从 CLM 猜测技术实现。
 
 首个参考目标：
 
@@ -17,16 +17,16 @@ TypeScript 5.x
 支持：
 
 - Use Case class / execute 方法骨架；
-- Guard 顺序保留；
-- Typed Assignment；
+- IIR dependency → constructor dependency；
+- Guard / Step 顺序保留；
 - Repository Contract interface；
 - External Port interface；
-- Typed Error；
-- SQLite adapter contract/TODO；
+- Typed Error class；
+- SQLite adapter boundary/TODO；
 - Generated Manifest；
 - 基于 Target Test Plan 的 Vitest 测试骨架。
 
-暂不自动实现未绑定 Primitive、第三方 SDK adapter、复杂事务协调、分布式锁、retry/backoff、消息队列 producer 和缺少语义的数据映射。
+暂不自动实现未绑定 Primitive、第三方 SDK adapter、复杂事务协调、分布式锁、retry/backoff、消息队列 producer 和缺少明确 mapping 的数据持久化。
 
 这些情况必须出现在 IIR `unresolved` 或 generation boundary 中，不允许 Generator 自行补全。
 
@@ -41,8 +41,10 @@ Target Profile persistence = SQLite
 
 ## 3. 生成命令
 
+Target Generator 不嵌入通用 `logic_cli.mjs`。
+
 ```bash
-node scripts/logic_cli.mjs generate-ts \
+node scripts/generate_typescript.mjs \
   implementation.iir.json \
   target-test-plan.json \
   -o generated-ts
@@ -74,7 +76,9 @@ SQLite 属于目标实现策略，不进入 CLM。实际 SQLite adapter 实现�
 
 ## 6. Use Case
 
-每个 IIR Use Case 映射为 class，执行顺序必须保持：
+每个 IIR Use Case 映射为 class。依赖只允许来自 IIR `dependencies`，并投影为 constructor dependency。
+
+执行顺序必须保持：
 
 ```text
 guards
@@ -82,11 +86,13 @@ guards
 → postconditions / effects
 ```
 
-依赖只能来自 IIR `dependencies`。
+第一版仍以安全骨架为主；尚未具备确定性语句映射的 step 不得被伪造为已实现。
 
 ## 7. Typed Assignment
 
-typed assignment 应生成确定性的 TypeScript 赋值。枚举值优先映射为 enum / literal union，不生成魔法字符串。
+typed assignment 最终应生成确定性的 TypeScript 赋值。枚举值优先映射为 enum / literal union，不生成无法追踪的魔法字符串。
+
+当前 v0.1 仍有部分 action 只保留为结构化 step 注释，这是下一阶段需要继续实现的重点。
 
 ## 8. SQLite
 
@@ -99,15 +105,19 @@ transaction_strategy = sqlite_transaction
 
 IIR 决定 Repository Contract 和事务边界；Generator 不把 SQL 细节写回 CLM。
 
-第一版只生成 SQLite adapter contract/TODO；缺少字段映射时不猜表结构。
+第一版只生成 SQLite adapter boundary/TODO；缺少实体字段到表/列的显式 mapping 时不猜表结构。
 
-## 9. Tests
+## 9. Typed Error
+
+Semantic Error 映射为稳定的 TypeScript `Error` 子类，并保存 `semanticId`，用于 traceability。
+
+## 10. Tests
 
 测试代码只消费 Target Test Plan，默认使用 Vitest。
 
-保留 Given / When / Expect；未知 fixture 只生成明确 TODO，不虚构领域数据。
+保留 Given / When / Expect 和 fake dependency；未知 fixture 只生成明确 TODO，不虚构领域数据。
 
-## 10. Manifest
+## 11. Manifest
 
 ```json
 {
@@ -122,6 +132,12 @@ IIR 决定 Repository Contract 和事务边界；Generator 不把 SQL 细节写�
 
 每个 artifact 保存 path、semantic_refs、generation_mode、content_hash。
 
-## 11. Generated Code Integrity
+## 12. Generated Code Integrity
 
-生成代码默认不可作为业务事实源。通过 Node CLI 的 `verify-manifest` 检测人工漂移；业务修改必须回到 CLM / Change Set。
+生成代码默认不可作为业务事实源。通过：
+
+```bash
+node scripts/logic_cli.mjs verify-manifest generated-ts
+```
+
+检测人工漂移。业务修改必须回到 CLM / Change Set。
