@@ -98,7 +98,7 @@ def main() -> int:
         migrated = migrate(source)
         args.output.write_text(json.dumps(migrated, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     except (OSError, json.JSONDecodeError, ValueError) as exc:
-        print(json.dumps({"ok": false, "error": str(exc)}, ensure_ascii=False))
+        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
         return 1
     return 0
 
