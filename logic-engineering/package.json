@@ -8,6 +8,8 @@
   "scripts": {
     "validate": "node scripts/logic_cli.mjs validate-clm",
     "pipeline": "node scripts/run_pipeline.mjs",
-    "regression": "node scripts/run_v02_regression.mjs"
+    "regression:core": "node scripts/run_v02_regression.mjs",
+    "regression:sqlite": "node scripts/run_sqlite_regression.mjs",
+    "regression": "npm run regression:core && npm run regression:sqlite"
   }
 }
