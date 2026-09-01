@@ -5,7 +5,7 @@
 ```text
 CLM
  ↓
-generate_test_vectors.py
+Node Test Vector Generator
  ↓
 Language-neutral Test Vectors
  ↓
@@ -13,22 +13,14 @@ Target Profile + IIR
  ↓
 Target Test Plan
  ↓
-Go/JUnit/pytest/... Test Generator
+TypeScript/Vitest Test Generator
 ```
 
-## 1. 为什么不能直接从 IIR 生成测试
+## 1. 测试期望来源
 
-测试的业务期望必须来自 CLM，而不是来自 IIR 或生成代码。
+测试业务期望必须来自 CLM，而不是 IIR 或 generated code。
 
-IIR 只负责补充：
-
-- Use Case 入口；
-- Repository / Port 依赖；
-- 测试框架；
-- mock/fake 边界；
-- transaction / adapter 技术装配。
-
-因此：
+IIR 只补充 Use Case 入口、Repository / Port 依赖、测试框架和 fake/mock 技术装配。
 
 ```text
 Test Expectation ← CLM Test Vector
@@ -41,57 +33,62 @@ Test Wiring      ← IIR + Target Profile
 {
   "target_test_plan": {
     "version": "0.1",
-    "language": "Go",
-    "framework": "testing + testify",
+    "target_profile": "ts-sqlite",
     "cases": []
   }
 }
 ```
 
-每个 case：
+每个 case 至少保存：
 
-```json
-{
-  "id": "test.scenario.order.cancel.pending.example",
-  "source_semantic_id": "scenario.order.cancel.pending",
-  "target_use_case": "usecase.behavior_order_cancel",
-  "given": {},
-  "invoke": {},
-  "expect": {},
-  "required_fakes": ["repository.domain_order"],
-  "unsupported": []
-}
+```text
+id
+kind
+given
+when
+expect
+use_case_id
+fake_dependencies
 ```
 
-## 3. 映射原则
+## 3. Node 命令
 
-- Scenario Vector → Use Case behavior invocation；
-- Rule Vector → Rule/Use Case guard 测试；
-- State Vector → Use Case 或 state transition 测试；
-- Property Intent → property test / 目标语言等价机制；
+先生成语言无关 Test Vector：
+
+```bash
+node scripts/logic_cli.mjs test-vectors model.json -o test-vectors.json
+```
+
+再生成 Target Test Plan：
+
+```bash
+node scripts/logic_cli.mjs target-tests \
+  test-vectors.json \
+  implementation.iir.json \
+  -o target-test-plan.json
+```
+
+## 4. 映射原则
+
+- Scenario Vector → Use Case invocation；
+- Rule Vector → Rule / guard 测试；
+- State Vector → state transition 测试；
+- Property Intent → property test；
 - Temporal Intent → integration test，不降级成普通 unit test。
 
-## 4. 不允许猜测
+## 5. 不允许猜测
 
-如果 Test Vector 缺少构造目标实体所需信息，Target Test Plan 应保留：
+Test Vector 缺少实体构造信息时，Target Test Plan 保留 unsupported/TODO，不伪造默认业务数据。
 
-```json
-"unsupported": [
-  "缺少 domain.order 的构造策略"
-]
+## 6. 首个 Reference Target
+
+```text
+TypeScript
+Node.js
+SQLite
+Vitest
 ```
 
-不要伪造默认字段值后宣称测试已完整生成。
+SQLite 只影响测试装配和 adapter，不改变 Test Expectation。
 
-## 5. 第一阶段支持范围
-
-v0.1 优先支持：
-
-- Go `testing + testify`；
-- Scenario；
-- Rule guard；
-- enum boundary；
-- state transition；
-- Repository fake / External Port fake 契约。
-
-真正目标语言测试代码生成应在 Target Test Plan `unsupported` 为空后执行。
+Target Test Plan 完成后由 TypeScript Generator 生成 Vitest 骨架。
