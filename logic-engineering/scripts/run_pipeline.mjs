@@ -9,7 +9,7 @@ function has(name,args){return args.includes(name)}
 function run(script,args,label){const p=spawnSync(process.execPath,[path.join(DIR,script),...args],{encoding:'utf8'});if(p.status!==0){console.error(JSON.stringify({ok:false,stage:label,stdout:p.stdout,stderr:p.stderr},null,2));process.exit(p.status??1)}if(p.stdout?.trim())console.log(`[${label}]\n${p.stdout.trim()}`)}
 function clmSchema(file){const v=String(rootOf(readJson(file)).version??'0.1');return path.join(SCHEMAS,v==='0.2'?'clm-v0.2.schema.json':'clm-v0.1.schema.json')}
 function validateClm(file,label){run('schema_validate.mjs',[file,clmSchema(file)],`${label} Schema`);run('logic_cli.mjs',['validate-clm',file],`${label} Semantic`)}
-const [model,...args]=process.argv.slice(2);if(!model){console.error('usage: node run_pipeline.mjs model.json [--patch p.json | --change-set c.json] [--target-profile profile.json] [--generate-ts] [--output-dir dir]');process.exit(2)}
+const [model,...args]=process.argv.slice(2);if(!model){console.error('usage: node run_pipeline.mjs model.json [--patch p.json | --change-set c.json] [--target-profile profile.json] [--generate-ts] [--verify-ts] [--output-dir dir]');process.exit(2)}
 const out=arg('--output-dir',args)??'.logic-engineering-output',patch=arg('--patch',args),change=arg('--change-set',args),profile=arg('--target-profile',args);if(patch&&change){console.error('--patch 与 --change-set 不能同时使用');process.exit(2)}
 fs.mkdirSync(out,{recursive:true});let working=model;validateClm(working,'校验原始 CLM');let changed=[];
 if(change){const updated=path.join(out,'updated.clm.json'),diff=path.join(out,'semantic-diff.json');run('apply_change_set.mjs',[working,change,'-o',updated,'--diff-output',diff],'应用语义变更集');working=updated;changed=readJson(diff).changed_semantic_ids??[];validateClm(working,'校验更新后的 CLM')}
@@ -24,7 +24,7 @@ if(profile){
   run('compile_iir.mjs',[working,profile,'-o',iir],'编译 IIR v0.2');
   run('schema_validate.mjs',[iir,path.join(SCHEMAS,'iir-v0.2.schema.json')],'校验 IIR Schema');
   run('logic_cli.mjs',['validate-iir',iir],'校验 IIR Semantic');
-  run('logic_cli.mjs',['target-tests',path.join(out,'test-vectors.json'),iir,'-o',targetTests],'编译目标测试计划');
-  if(has('--generate-ts',args)){generated=path.join(out,'generated-ts');run('generate_typescript.mjs',[iir,targetTests,'-o',generated],'生成 TypeScript + SQLite');run('logic_cli.mjs',['verify-manifest',generated],'校验生成产物完整性')}
-}else if(has('--generate-ts',args)){console.error('--generate-ts 需要 --target-profile');process.exit(2)}
+  run('compile_target_tests.mjs',[path.join(out,'test-vectors.json'),iir,'-o',targetTests],'编译目标测试计划');
+  if(has('--generate-ts',args)){generated=path.join(out,'generated-ts');run('generate_typescript.mjs',[iir,targetTests,'-o',generated],'生成 TypeScript + SQLite');run('logic_cli.mjs',['verify-manifest',generated],'校验生成产物完整性');if(has('--verify-ts',args))run('verify_typescript.mjs',[generated],'执行 TypeScript/Vitest Gate')}
+}else if(has('--generate-ts',args)||has('--verify-ts',args)){console.error('--generate-ts/--verify-ts 需要 --target-profile');process.exit(2)}
 console.log(JSON.stringify({ok:true,clm:working,output_dir:out,generated_typescript:generated},null,2));
