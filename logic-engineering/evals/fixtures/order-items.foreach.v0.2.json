@@ -59,7 +59,68 @@
     "states": [],
     "effects": [],
     "constraints": [],
-    "scenarios": [],
+    "scenarios": [
+      {
+        "id": "scenario.order.release_reserved_items",
+        "kind": "scenario",
+        "name": "只释放已预留明细",
+        "given": [
+          {
+            "target": { "ref": "domain.order.items" },
+            "value": {
+              "list": [
+                {
+                  "object": {
+                    "type": "domain.order_item",
+                    "fields": {
+                      "domain.order_item.reserved": { "literal": true },
+                      "domain.order_item.released": { "literal": false }
+                    }
+                  }
+                },
+                {
+                  "object": {
+                    "type": "domain.order_item",
+                    "fields": {
+                      "domain.order_item.reserved": { "literal": false },
+                      "domain.order_item.released": { "literal": false }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "when": ["behavior.order.release_reserved_items"],
+        "then": [
+          {
+            "target": { "ref": "domain.order.items" },
+            "value": {
+              "list": [
+                {
+                  "object": {
+                    "type": "domain.order_item",
+                    "fields": {
+                      "domain.order_item.reserved": { "literal": true },
+                      "domain.order_item.released": { "literal": true }
+                    }
+                  }
+                },
+                {
+                  "object": {
+                    "type": "domain.order_item",
+                    "fields": {
+                      "domain.order_item.reserved": { "literal": false },
+                      "domain.order_item.released": { "literal": false }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
     "primitives": [],
     "relations": [],
     "evidence": []
