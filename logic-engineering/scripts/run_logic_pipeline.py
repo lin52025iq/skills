@@ -4,12 +4,13 @@
 流程：
 1. 自动识别 CLM 版本并选择 schema
 2. 校验原始 CLM
-3. 可选应用 Semantic Patch
+3. 可选应用单个 Semantic Patch 或原子 Semantic Change Set
 4. 校验更新后的 CLM
 5. 分析修改影响范围
-6. 生成中文逻辑投影
-7. 从 CLM 独立生成测试向量
-8. 可选编译 IIR
+6. 生成 Symbol Table
+7. 生成中文逻辑投影
+8. 从 CLM 独立生成测试向量
+9. 可选编译 IIR
 """
 
 from __future__ import annotations
@@ -71,6 +72,23 @@ def patch_changed_ids(path: Path) -> List[str]:
     return list(dict.fromkeys(ids))
 
 
+def change_set_changed_ids(path: Path) -> List[str]:
+    payload = load_json(path)
+    cs = payload.get("semantic_change_set", payload)
+    ids: List[str] = []
+    for op in cs.get("operations", []) or []:
+        if not isinstance(op, dict):
+            continue
+        for key in ("target_semantic_id", "source", "target"):
+            value = op.get(key)
+            if isinstance(value, str):
+                ids.append(value)
+        after = op.get("after")
+        if op.get("operation") == "ADD_NODE" and isinstance(after, dict) and isinstance(after.get("id"), str):
+            ids.append(after["id"])
+    return list(dict.fromkeys(ids))
+
+
 def validate_model(path: Path, schema: Path, label: str) -> None:
     run([
         sys.executable,
@@ -84,7 +102,9 @@ def validate_model(path: Path, schema: Path, label: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="运行逻辑工程最小流水线")
     parser.add_argument("clm", type=Path)
-    parser.add_argument("--patch", type=Path)
+    mutation = parser.add_mutually_exclusive_group()
+    mutation.add_argument("--patch", type=Path, help="应用单个 Semantic Patch")
+    mutation.add_argument("--change-set", type=Path, help="原子应用 Semantic Change Set v0.2")
     parser.add_argument("--target-profile", type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path(".logic-engineering-output"))
     parser.add_argument("--schema", type=Path, help="显式覆盖自动 schema 选择")
@@ -99,24 +119,38 @@ def main() -> int:
 
     impact = None
     changed_ids: List[str] = []
+    semantic_diff = None
 
-    if args.patch:
-        changed_ids = patch_changed_ids(args.patch)
+    if args.patch or args.change_set:
         updated = out / "updated.clm.json"
-        diff = out / "semantic-diff.json"
-        run([
-            sys.executable,
-            str(SCRIPT_DIR / "apply_semantic_patch.py"),
-            str(working_clm),
-            str(args.patch),
-            "-o",
-            str(updated),
-            "--diff-output",
-            str(diff),
-        ], "应用语义补丁")
-        working_clm = updated
+        semantic_diff = out / "semantic-diff.json"
 
-        # 补丁可能升级模型版本，因此应用后重新自动选择 schema。
+        if args.patch:
+            changed_ids = patch_changed_ids(args.patch)
+            run([
+                sys.executable,
+                str(SCRIPT_DIR / "apply_semantic_patch.py"),
+                str(working_clm),
+                str(args.patch),
+                "-o",
+                str(updated),
+                "--diff-output",
+                str(semantic_diff),
+            ], "应用语义补丁")
+        else:
+            changed_ids = change_set_changed_ids(args.change_set)
+            run([
+                sys.executable,
+                str(SCRIPT_DIR / "apply_semantic_change_set.py"),
+                str(working_clm),
+                str(args.change_set),
+                "-o",
+                str(updated),
+                "--diff-output",
+                str(semantic_diff),
+            ], "应用语义变更集")
+
+        working_clm = updated
         schema = args.schema or detect_schema(working_clm)
         validate_model(working_clm, schema, "校验更新后的 CLM")
 
@@ -176,7 +210,7 @@ def main() -> int:
         "clm": str(working_clm),
         "symbol_table": str(symbol_table),
         "human_logic": str(human_logic),
-        "semantic_diff": str(out / "semantic-diff.json") if args.patch else None,
+        "semantic_diff": str(semantic_diff) if semantic_diff else None,
         "impact_analysis": str(impact) if impact else None,
         "test_vectors": str(test_vectors),
         "iir": str(iir) if iir else None,
