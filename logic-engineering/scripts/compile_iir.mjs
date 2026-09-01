@@ -5,14 +5,8 @@ function pascal(value){return String(value??'Generated').split(/[^A-Za-z0-9]+/).
 function camel(value){const p=pascal(value);return p[0].toLowerCase()+p.slice(1);}
 function entityOfField(ref){const parts=String(ref).split('.');return parts.length>=3?parts.slice(0,2).join('.'):null;}
 function collectRefs(v,out=new Set()){if(Array.isArray(v))for(const x of v)collectRefs(x,out);else if(v&&typeof v==='object'){if(typeof v.ref==='string')out.add(v.ref);for(const x of Object.values(v))collectRefs(x,out);}return out;}
-function collectGlobalRefs(v,symbols,scope,out=new Set()){
-  if(Array.isArray(v)){for(const x of v)collectGlobalRefs(x,symbols,scope,out);return out;}
-  if(v&&typeof v==='object'){
-    if(typeof v.ref==='string'&&!resolveScopedRef(v.ref,scope,symbols))out.add(v.ref);
-    for(const x of Object.values(v))collectGlobalRefs(x,symbols,scope,out);
-  }
-  return out;
-}
+function collectGlobalRefs(v,symbols,scope,out=new Set()){if(Array.isArray(v)){for(const x of v)collectGlobalRefs(x,symbols,scope,out);return out;}if(v&&typeof v==='object'){if(typeof v.ref==='string'&&!resolveScopedRef(v.ref,scope,symbols))out.add(v.ref);for(const x of Object.values(v))collectGlobalRefs(x,symbols,scope,out);}return out;}
+function safeSqlIdentifier(value){return typeof value==='string'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(value);}
 
 function compileDomain(root){
   const enums=[],entities=[],runtime=[];
@@ -35,7 +29,7 @@ function compileContracts(root){
   for(const e of root.effects??[]){
     if(['read','write','persist'].includes(e.kind)){
       const entityRef=entityOfField(e.resource)??e.resource??'domain.unknown',id=repositoryId(e.resource);
-      if(!repoMap.has(id))repoMap.set(id,{id,kind:'repository_contract',entity_ref:entityRef,semantic_refs:[],operations:[],binding:{strategy:'repository',provider:null}});
+      if(!repoMap.has(id))repoMap.set(id,{id,kind:'repository_contract',entity_ref:entityRef,semantic_refs:[],operations:[],binding:{strategy:'repository',provider:null,mapping:null}});
       const repo=repoMap.get(id);repo.semantic_refs.push(e.id);const name=e.kind==='read'?'load':'save';if(!repo.operations.some(x=>x.name===name))repo.operations.push({name,semantic_refs:[e.id]});
     }else if(['external_call','emit','schedule'].includes(e.kind)){
       const system=e.system??(e.kind==='emit'?'event_bus':e.kind),id=`port.${String(system).replace(/[^A-Za-z0-9_.-]/g,'_')}`;
@@ -44,6 +38,29 @@ function compileContracts(root){
     }
   }
   return{repositories:[...repoMap.values()],ports:[...portMap.values()]};
+}
+
+function attachPersistenceMappings(repositories,profile,symbols,unresolved){
+  const explicit=profile.persistence_generation==='explicit_mapping',mappings=profile.persistence_mappings??{};
+  for(const repo of repositories){
+    repo.binding.provider=profile.persistence??null;
+    if(!profile.persistence){unresolved.push({semantic_ref:repo.entity_ref,reason:'Target Profile 缺少 persistence provider',required_for:repo.id,severity:'blocking'});continue;}
+    const mapping=mappings[repo.entity_ref]??null;repo.binding.mapping=mapping?structuredClone(mapping):null;
+    if(!explicit)continue;
+    if(!mapping){unresolved.push({semantic_ref:repo.entity_ref,reason:`缺少显式 persistence mapping: ${repo.entity_ref}`,required_for:repo.id,severity:'blocking'});continue;}
+    if(!safeSqlIdentifier(mapping.table))unresolved.push({semantic_ref:repo.entity_ref,reason:`非法或缺失 table 名: ${mapping.table??'<missing>'}`,required_for:repo.id,severity:'blocking'});
+    const pk=mapping.primary_key,pkSymbol=typeof pk==='string'?symbols[pk]:null;
+    if(!pkSymbol||pkSymbol.kind!=='field'||pkSymbol.owner!==repo.entity_ref)unresolved.push({semantic_ref:repo.entity_ref,reason:`primary_key 必须引用 ${repo.entity_ref} 的字段: ${pk??'<missing>'}`,required_for:repo.id,severity:'blocking'});
+    const columns=mapping.columns;
+    if(!columns||typeof columns!=='object'||Array.isArray(columns)){unresolved.push({semantic_ref:repo.entity_ref,reason:'persistence mapping.columns 必须是对象',required_for:repo.id,severity:'blocking'});continue;}
+    const entityFields=Object.values(symbols).filter(x=>x.kind==='field'&&x.owner===repo.entity_ref).map(x=>x.id);
+    for(const field of entityFields){if(!Object.hasOwn(columns,field))unresolved.push({semantic_ref:field,reason:`显式 save mapping 缺少字段 column: ${field}`,required_for:repo.id,severity:'blocking'});}
+    for(const [field,column] of Object.entries(columns)){
+      const symbol=symbols[field];if(!symbol||symbol.kind!=='field'||symbol.owner!==repo.entity_ref)unresolved.push({semantic_ref:field,reason:`column mapping 引用了不属于 ${repo.entity_ref} 的字段`,required_for:repo.id,severity:'blocking'});
+      if(!safeSqlIdentifier(column))unresolved.push({semantic_ref:field,reason:`非法 SQLite column 名: ${column}`,required_for:repo.id,severity:'blocking'});
+    }
+    if(typeof pk==='string'&&!Object.hasOwn(columns,pk))unresolved.push({semantic_ref:pk,reason:'primary_key 必须出现在 columns mapping 中',required_for:repo.id,severity:'blocking'});
+  }
 }
 
 function compilePlans(root,profile,unresolved){
@@ -65,25 +82,14 @@ function compileStep(id,index,symbols,unresolved,owner,stack=new Set(),scope=nul
   if(node.kind==='foreach'){
     const loopScope=collectionElementScope(node.collection,node.item,symbols);
     if(!loopScope.valid){unresolved.push({semantic_ref:id,reason:loopScope.reason,required_for:owner,severity:'blocking'});return{semantic_ref:id,kind:'foreach',unresolved:true,collection:node.collection??null,item_alias:node.item??'item',do_steps:[]};}
-    if(scope&&node.collection?.ref&&resolveScopedRef(node.collection.ref,scope,symbols)){unresolved.push({semantic_ref:id,reason:'v0.2 暂不支持嵌套 foreach 使用 scoped collection',required_for:owner,severity:'blocking'});}
+    if(scope&&node.collection?.ref&&resolveScopedRef(node.collection.ref,scope,symbols))unresolved.push({semantic_ref:id,reason:'v0.2 暂不支持嵌套 foreach 使用 scoped collection',required_for:owner,severity:'blocking'});
     return{semantic_ref:id,kind:'foreach',collection:node.collection??null,collection_ref:node.collection?.ref??null,item_alias:loopScope.alias,item_type:loopScope.entityType,when:node.when??null,do_steps:(node.do??[]).map(x=>compileStep(x,index,symbols,unresolved,owner,next,loopScope))};
   }
   return{semantic_ref:id,kind:node.kind,operation:node.operation??null,target:node.target??null,value:node.value??null,effects:node.effects??[],when:node.when??null,scope:scope?{alias:scope.alias,entity_type:scope.entityType}:null};
 }
 function collectEffects(step,out=new Set()){for(const x of step.effects??[])out.add(x);for(const x of step.then_steps??[])collectEffects(x,out);for(const x of step.else_steps??[])collectEffects(x,out);for(const x of step.do_steps??[])collectEffects(x,out);return out;}
 function collectStepRefs(step,out=new Set()){if(step.semantic_ref)out.add(step.semantic_ref);for(const x of step.then_steps??[])collectStepRefs(x,out);for(const x of step.else_steps??[])collectStepRefs(x,out);for(const x of step.do_steps??[])collectStepRefs(x,out);return out;}
-function collectStepGlobalRefs(step,symbols,scope,out=new Set()){
-  if(step.kind==='foreach'){
-    collectGlobalRefs(step.collection,symbols,scope,out);
-    const loopScope={alias:step.item_alias,entityType:step.item_type};
-    collectGlobalRefs(step.when,symbols,loopScope,out);
-    for(const child of step.do_steps??[])collectStepGlobalRefs(child,symbols,loopScope,out);
-    return out;
-  }
-  collectGlobalRefs(step.when,symbols,scope,out);collectGlobalRefs(step.target,symbols,scope,out);collectGlobalRefs(step.value,symbols,scope,out);
-  for(const child of step.then_steps??[])collectStepGlobalRefs(child,symbols,scope,out);for(const child of step.else_steps??[])collectStepGlobalRefs(child,symbols,scope,out);
-  return out;
-}
+function collectStepGlobalRefs(step,symbols,scope,out=new Set()){if(step.kind==='foreach'){collectGlobalRefs(step.collection,symbols,scope,out);const loopScope={alias:step.item_alias,entityType:step.item_type};collectGlobalRefs(step.when,symbols,loopScope,out);for(const child of step.do_steps??[])collectStepGlobalRefs(child,symbols,loopScope,out);return out;}collectGlobalRefs(step.when,symbols,scope,out);collectGlobalRefs(step.target,symbols,scope,out);collectGlobalRefs(step.value,symbols,scope,out);for(const child of step.then_steps??[])collectStepGlobalRefs(child,symbols,scope,out);for(const child of step.else_steps??[])collectStepGlobalRefs(child,symbols,scope,out);return out;}
 
 function compileUseCases(root,index,symbols,repositories,ports,unresolved){
   const use_cases=[];
@@ -102,7 +108,7 @@ function compileErrors(root){const refs=new Set();for(const b of root.behaviors?
 
 function compile(clm,profile){
   const root=rootOf(clm),index=buildNodeIndex(clm),symbols=buildSymbolTable(clm),unresolved=[],domain=compileDomain(root),contracts=compileContracts(root);
-  for(const repo of contracts.repositories){repo.binding.provider=profile.persistence??null;if(!profile.persistence)unresolved.push({semantic_ref:repo.entity_ref,reason:'Target Profile 缺少 persistence provider',required_for:repo.id,severity:'blocking'});}
+  attachPersistenceMappings(contracts.repositories,profile,symbols,unresolved);
   const plans=compilePlans(root,profile,unresolved),use_cases=compileUseCases(root,index,symbols,contracts.repositories,contracts.ports,unresolved),error_mappings=compileErrors(root);
   const generation_regions=[...use_cases.map(u=>({id:`region.${u.id}`,mode:'generated',semantic_refs:u.semantic_refs})),...contracts.repositories.map(r=>({id:`region.${r.id}`,mode:'contract_only',semantic_refs:r.semantic_refs.length?r.semantic_refs:[r.entity_ref]})),...contracts.ports.map(p=>({id:`region.${p.id}`,mode:p.generation_mode,semantic_refs:p.semantic_refs}))];
   const traceability=use_cases.map(u=>{const refs=new Set(u.semantic_refs);for(const g of u.guards??[])refs.add(g.semantic_ref);for(const step of u.steps??[])collectStepRefs(step,refs);return{implementation_id:u.id,semantic_refs:[...refs]};});
