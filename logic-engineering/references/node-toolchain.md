@@ -48,25 +48,14 @@ validate-iir     校验 IIR 语义
 verify-manifest  校验 generated artifact 漂移
 ```
 
-IIR 编译和 Target Test 编译已经拆成独立确定性编译器，不再由通用 CLI 承担：
+IIR 编译和 Target Test 编译使用独立确定性编译器：
 
 ```bash
-node scripts/compile_iir.mjs \
-  model.json \
-  evals/fixtures/ts-sqlite.target-profile.json \
-  -o implementation.iir.json
-
-node scripts/compile_target_tests.mjs \
-  test-vectors.json \
-  implementation.iir.json \
-  -o target-test-plan.json
+node scripts/compile_iir.mjs model.json target-profile.json -o implementation.iir.json
+node scripts/compile_target_tests.mjs test-vectors.json implementation.iir.json -o target-test-plan.json
 ```
 
-## 4. Target Adapter
-
-Target Generator 不嵌入通用 CLI。
-
-当前 TypeScript + SQLite v0.2：
+## 4. TypeScript Target Adapter
 
 ```bash
 node scripts/generate_typescript_v02.mjs \
@@ -75,13 +64,23 @@ node scripts/generate_typescript_v02.mjs \
   -o generated-ts
 ```
 
-生成后：
+生成后固定执行两个零依赖 Gate：
 
 ```bash
 node scripts/logic_cli.mjs verify-manifest generated-ts
+node scripts/validate_generated_typescript.mjs generated-ts
 ```
 
-如果环境已具备 `tsc` 与 `vitest`：
+第二个 Gate 会阻止：
+
+```text
+skeleton placeholder
+expect(true).toBe(true)
+未解析 Semantic Ref 动态访问
+占位 throw
+```
+
+如果环境已具备 `tsc` 与 `vitest`，再执行真实运行时 Gate：
 
 ```bash
 node scripts/verify_typescript.mjs generated-ts
@@ -100,6 +99,7 @@ migrate_clm_v01_to_v02.mjs
 compile_iir.mjs
 compile_target_tests.mjs
 generate_typescript_v02.mjs
+validate_generated_typescript.mjs
 verify_typescript.mjs
 run_pipeline.mjs
 run_v02_regression.mjs
@@ -123,7 +123,7 @@ Reference Target 只验证目标实现投影，不改变 CLM / IIR 的语言无�
 
 - 公共结构、Node Registry、Symbol Table 和 Semantic Hash 集中在 `scripts/lib/model.mjs`；
 - 通用 CLI 不包含目标语言生成逻辑；
-- IIR / Target Test 使用独立编译器，避免 CLI 内部出现两套实现；
+- IIR / Target Test 使用独立编译器，避免两套实现；
 - Target Generator 以独立 adapter 扩展；
 - 新增确定性工具默认使用 Node.js；
 - 不长期维护 Python/Node 或新旧 Generator 双实现；
