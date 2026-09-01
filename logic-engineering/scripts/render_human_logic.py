@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """将 CLM 投影为中文逻辑视图。
 
-当前实现聚焦 Behavior、Rule、Decision、Action、StateMachine、Constraint。
+当前聚焦 Behavior、Rule、Decision、Action、StateMachine、Constraint。
 自然语言只解释现有 CLM，不产生新业务规则。
 """
 
@@ -10,25 +10,14 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, List
 
-COLLECTIONS = ("domain", "behaviors", "states", "effects", "constraints", "scenarios", "primitives")
+from clm_model import build_node_index, root_of
+from expression_ast import humanize_expression
 
 
 def load_json(path: Path) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def iter_nodes(clm: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
-    root = clm.get("clm", clm)
-    for collection in COLLECTIONS:
-        for node in root.get(collection, []) or []:
-            if isinstance(node, dict):
-                yield node
-
-
-def index_nodes(clm: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    return {node["id"]: node for node in iter_nodes(clm) if node.get("id")}
 
 
 def zh_name(value: Any) -> str:
@@ -48,38 +37,60 @@ def zh_name(value: Any) -> str:
     return mapping.get(text, text)
 
 
+def render_value(value: Any) -> str:
+    if isinstance(value, dict):
+        if "ref" in value:
+            return value["ref"]
+        if "literal" in value:
+            return zh_name(value["literal"])
+        if "enum" in value and isinstance(value["enum"], dict):
+            return zh_name(value["enum"].get("value"))
+        if "null" in value:
+            return "空值"
+    if isinstance(value, list):
+        return "、".join(f"“{zh_name(v)}”" for v in value)
+    return zh_name(value)
+
+
 def render_expr(expr: Any) -> str:
     if isinstance(expr, str):
         return expr
     if not isinstance(expr, dict):
         return str(expr)
 
+    # CLM v0.2 Typed Expression AST
+    if "op" in expr and ("left" in expr or "items" in expr or "item" in expr):
+        op = expr.get("op")
+        if op in {"all", "any"}:
+            parts = [render_expr(x) for x in expr.get("items", [])]
+            joiner = "，并且" if op == "all" else "，或者"
+            return joiner.join(parts)
+        if op == "not":
+            return f"不满足（{render_expr(expr.get('item'))}）"
+        left = render_value(expr.get("left"))
+        right = render_value(expr.get("right"))
+        operators = {
+            "eq": "等于", "ne": "不等于", "gt": "大于", "ge": "大于等于",
+            "lt": "小于", "le": "小于等于", "in": "属于", "not_in": "不属于",
+        }
+        return f"{left}{operators.get(op, op or '满足')}{right}"
+
+    # v0.1 兼容
     op = expr.get("operator") or expr.get("op")
     if op in {"all", "any"}:
-        parts = [render_expr(x) for x in expr.get("conditions", [])]
+        parts = [render_expr(x) for x in expr.get("conditions", expr.get("args", []))]
         joiner = "，并且" if op == "all" else "，或者"
         return joiner.join(parts)
     if op == "not":
-        return f"不满足（{render_expr(expr.get('condition'))}）"
+        return f"不满足（{render_expr(expr.get('condition', expr.get('arg')))}）"
 
     left = expr.get("subject", expr.get("left"))
     right = expr.get("value", expr.get("right"))
     operators = {
-        "eq": "等于",
-        "==": "等于",
-        "ne": "不等于",
-        "!=": "不等于",
-        "gt": "大于",
-        ">": "大于",
-        "gte": "大于等于",
-        ">=": "大于等于",
-        "lt": "小于",
-        "<": "小于",
-        "lte": "小于等于",
-        "<=": "小于等于",
-        "in": "属于",
-        "not_in": "不属于",
-        "exists": "存在",
+        "eq": "等于", "==": "等于", "ne": "不等于", "!=": "不等于",
+        "gt": "大于", ">": "大于", "gte": "大于等于", ">=": "大于等于",
+        "lt": "小于", "<": "小于", "lte": "小于等于", "<=": "小于等于",
+        "in": "属于", "not_in": "不属于", "exists": "存在",
     }
     if op in {"in", "not_in"} and isinstance(right, list):
         rendered = "、".join(f"“{zh_name(v)}”" for v in right)
@@ -90,33 +101,31 @@ def render_expr(expr: Any) -> str:
 
 
 def render_rule(node: Dict[str, Any]) -> str:
+    if "expression" in node:
+        return render_expr(node["expression"])
     if "conditions" in node:
-        expr = {"operator": node.get("operator"), "conditions": node.get("conditions", [])}
-        return render_expr(expr)
-    expr = {
+        return render_expr({"operator": node.get("operator"), "conditions": node.get("conditions", [])})
+    return render_expr({
         "operator": node.get("operator"),
         "subject": node.get("subject"),
         "value": node.get("value"),
-    }
-    return render_expr(expr)
+    })
 
 
 def render_action(node: Dict[str, Any]) -> str:
     op = node.get("operation")
     if node.get("kind") == "foreach":
-        return f"遍历 {node.get('collection')}，对满足条件的项执行关联操作"
+        cond = f"，仅处理满足“{render_expr(node['when'])}”的项" if node.get("when") else ""
+        return f"遍历 {node.get('collection')}{cond}，执行关联操作"
     if op == "assign":
-        return f"将 {node.get('target')} 设置为“{zh_name(node.get('value'))}”"
+        return f"将 {node.get('target')} 设置为“{render_value(node.get('value'))}”"
     if op:
         return node.get("description") or f"执行 {op}"
     return node.get("description") or node.get("name") or node.get("id", "执行操作")
 
 
 def render_behavior(node: Dict[str, Any], idx: Dict[str, Dict[str, Any]]) -> str:
-    lines: List[str] = []
-    lines.append(f"## {node.get('name') or node['id']}")
-    lines.append("")
-    lines.append(f"标识：`{node['id']}`")
+    lines: List[str] = [f"## {node.get('name') or node['id']}", "", f"标识：`{node['id']}`"]
     if node.get("description"):
         lines.append(f"\n目的：{node['description']}")
 
@@ -125,8 +134,7 @@ def render_behavior(node: Dict[str, Any], idx: Dict[str, Dict[str, Any]]) -> str
         lines.append("\n### 前置条件")
         for ref in pres:
             target = idx.get(ref)
-            text = render_rule(target) if target else ref
-            lines.append(f"- {text}。")
+            lines.append(f"- {(render_rule(target) if target else ref)}。")
 
     flow = node.get("flow", []) or []
     if flow:
@@ -137,16 +145,18 @@ def render_behavior(node: Dict[str, Any], idx: Dict[str, Dict[str, Any]]) -> str
                 text = ref
             elif target.get("kind") == "decision":
                 cond = target.get("when")
-                if isinstance(cond, str) and cond in idx:
-                    cond_text = render_rule(idx[cond])
-                else:
-                    cond_text = render_expr(cond)
-                then_refs = target.get("then", []) or []
+                cond_text = render_rule(idx[cond]) if isinstance(cond, str) and cond in idx else render_expr(cond)
                 then_texts = []
-                for t in then_refs:
+                for t in target.get("then", []) or []:
                     tnode = idx.get(t)
                     then_texts.append(render_action(tnode) if tnode else t)
+                else_texts = []
+                for t in target.get("else", []) or []:
+                    tnode = idx.get(t)
+                    else_texts.append(render_action(tnode) if tnode else t)
                 text = f"如果 {cond_text}，则 {'；'.join(then_texts) or '执行对应处理'}"
+                if else_texts:
+                    text += f"；否则 {'；'.join(else_texts)}"
             else:
                 text = render_action(target)
             lines.append(f"{n}. {text}。")
@@ -163,10 +173,7 @@ def render_behavior(node: Dict[str, Any], idx: Dict[str, Dict[str, Any]]) -> str
         lines.append("\n### 完成条件 / 保证")
         for ref in posts:
             target = idx.get(ref)
-            if target and target.get("expression"):
-                text = render_expr(target["expression"])
-            else:
-                text = (target or {}).get("description") or ref
+            text = render_expr(target["expression"]) if target and target.get("expression") else (target or {}).get("description") or ref
             lines.append(f"- {text}。")
 
     return "\n".join(lines)
@@ -183,32 +190,33 @@ def render_state_machine(node: Dict[str, Any], idx: Dict[str, Dict[str, Any]]) -
         for ref in transitions:
             t = idx.get(ref)
             if t:
-                lines.append(f"- “{zh_name(t.get('from'))}” → “{zh_name(t.get('to'))}”，由 `{t.get('trigger')}` 触发。")
+                line = f"- “{zh_name(t.get('from'))}” → “{zh_name(t.get('to'))}”，由 `{t.get('trigger')}` 触发"
+                if t.get("guard"):
+                    line += f"，条件为：{render_expr(t['guard'])}"
+                lines.append(line + "。")
             else:
                 lines.append(f"- {ref}")
     return "\n".join(lines)
 
 
 def render(clm: Dict[str, Any]) -> str:
-    idx = index_nodes(clm)
-    root = clm.get("clm", clm)
+    idx = build_node_index(clm)
+    root = root_of(clm)
     title = root.get("name") or root.get("id") or "逻辑模型"
     chunks = [f"# {title} — 人类可读逻辑", ""]
 
     for behavior in root.get("behaviors", []) or []:
-        chunks.append(render_behavior(behavior, idx))
-        chunks.append("")
+        chunks.extend([render_behavior(behavior, idx), ""])
 
     for state in root.get("states", []) or []:
         if state.get("kind") == "state_machine":
-            chunks.append(render_state_machine(state, idx))
-            chunks.append("")
+            chunks.extend([render_state_machine(state, idx), ""])
 
     constraints = root.get("constraints", []) or []
     if constraints:
         chunks.extend(["## 全局约束", ""])
         for c in constraints:
-            if c.get("kind") in {"invariant", "postcondition", "precondition"}:
+            if c.get("kind") in {"invariant", "postcondition", "precondition", "constraint"}:
                 text = render_expr(c.get("expression")) if c.get("expression") else c.get("description")
             elif c.get("kind") == "temporal":
                 text = f"当 {c.get('trigger')} 发生后，最终必须发生 {c.get('requirement')}"
