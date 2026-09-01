@@ -32,6 +32,7 @@ if(profile){
     run('generate_typescript_transactions.mjs',[iir,generated],'生成 TypeScript 事务层');
     run('logic_cli.mjs',['verify-manifest',generated],'校验生成产物完整性');
     run('validate_generated_typescript.mjs',[generated],'校验 TypeScript 生成质量');
+    run('validate_generated_entrypoints.mjs',[iir,generated],'校验生成实现正式入口');
     if(has('--verify-ts',args))run('verify_typescript.mjs',[generated],'执行 TypeScript/Vitest Gate');
   }
 }else if(has('--generate-ts',args)||has('--verify-ts',args)){console.error('--generate-ts/--verify-ts 需要 --target-profile');process.exit(2)}
