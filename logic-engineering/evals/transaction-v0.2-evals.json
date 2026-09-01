@@ -1,0 +1,47 @@
+{
+  "suite": "transaction-v0.2",
+  "cases": [
+    {
+      "id": "atomicity-full-behavior",
+      "input": "evals/fixtures/order-cancel.atomicity.v0.2.json",
+      "target_profile": "evals/fixtures/ts-sqlite.target-profile.json",
+      "expect": [
+        "Atomicity 必须声明 behavior_ref 与 members",
+        "IIR transaction plan 绑定对应 Behavior",
+        "members 与 Behavior flow 顺序一致且完整覆盖",
+        "Use Case 保存 transaction_plan_ids",
+        "TypeScript 生成 Transactional Use Case wrapper",
+        "Manifest implementation_entrypoints 指向 Transactional wrapper"
+      ]
+    },
+    {
+      "id": "sqlite-transaction-runner",
+      "expect": [
+        "生成 DefaultSqliteTransactionRunner",
+        "成功路径执行 BEGIN IMMEDIATE → work → COMMIT",
+        "失败路径执行 BEGIN IMMEDIATE → work throws → ROLLBACK",
+        "runner 依赖与 Repository Adapter 相同的 SqliteExecutor 契约",
+        "事务层加入 tsconfig 和 manifest"
+      ]
+    },
+    {
+      "id": "partial-atomicity-rejected",
+      "input": "evals/fixtures/order-cancel.atomicity.partial.v0.2.json",
+      "expect": [
+        "CLM Schema 结构合法",
+        "IIR 可以描述该 transaction plan",
+        "当前 Target Profile transaction_scope=full_behavior",
+        "IIR Validator 返回 IIR_TRANSACTION_SCOPE_UNSUPPORTED",
+        "不得通过扩大事务范围静默生成"
+      ]
+    },
+    {
+      "id": "shared-session-contract",
+      "expect": [
+        "事务 runner 与 Repository Adapter 必须使用同一 SQLite transaction/session context",
+        "驱动选择属于项目集成层",
+        "该技术绑定不得写回 CLM"
+      ]
+    }
+  ]
+}
