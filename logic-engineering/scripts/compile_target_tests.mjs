@@ -2,22 +2,25 @@
 import {readJson,writeJson} from './lib/model.mjs';
 
 function findUseCaseByBehavior(root,behavior){return (root.use_cases??[]).find(u=>(u.semantic_refs??[]).includes(behavior)||u.semantic_id===behavior);}
-function findUseCaseByGuard(root,rule){return (root.use_cases??[]).find(u=>(u.guards??[]).some(g=>g.semantic_ref===rule));}
 function guardFor(root,rule){for(const u of root.use_cases??[]){const g=(u.guards??[]).find(x=>x.semantic_ref===rule);if(g)return {useCase:u,guard:g};}return null;}
 
 function compile(vectorsDoc,iirDoc){
   const root=iirDoc.iir??iirDoc,cases=[];
   for(const v of vectorsDoc.vectors??[]){
     const item={id:v.id,source_semantic_id:v.source_semantic_id,kind:v.kind,given:v.given??{},when:v.when??null,expect:v.expect??{},target_kind:null,target_id:null,use_case_id:null,fake_dependencies:[],required_input_refs:[],fixture_constraints:[],unsupported:[]};
-    if(['rule_positive','rule_negative','boundary_intent','condition_assignment_intent','rule_expression_intent'].includes(v.kind)){
+    if(['rule_positive','rule_negative'].includes(v.kind)){
+      const hit=guardFor(root,v.source_semantic_id);
+      if(hit){item.target_kind='guard';item.target_id=hit.guard.semantic_ref;item.use_case_id=hit.useCase.id;item.required_input_refs=hit.useCase.input_refs??[];item.fixture_constraints=[hit.guard.expression].filter(Boolean);item.fake_dependencies=hit.useCase.dependencies??[];if(typeof item.expect?.rule_result!=='boolean')item.unsupported.push('Rule 正反例缺少布尔 rule_result');}
+      else item.unsupported.push('没有找到引用该 Rule 的 IIR Guard');
+    }else if(['boundary_intent','condition_assignment_intent','rule_expression_intent','property_intent','temporal_integration_intent'].includes(v.kind)){
       const hit=guardFor(root,v.source_semantic_id);
       if(hit){item.target_kind='guard';item.target_id=hit.guard.semantic_ref;item.use_case_id=hit.useCase.id;item.required_input_refs=hit.useCase.input_refs??[];item.fixture_constraints=[hit.guard.expression].filter(Boolean);item.fake_dependencies=hit.useCase.dependencies??[];}
-      else item.unsupported.push('没有找到引用该 Rule 的 IIR Guard');
+      item.unsupported.push(`${v.kind} 仍是测试意图，缺少可安全执行的具体输入/期望`);
     }else if(v.kind==='scenario'){
       const behavior=(v.when?.behaviors??[])[0],uc=findUseCaseByBehavior(root,behavior);
       if(uc){item.target_kind='use_case';item.target_id=uc.id;item.use_case_id=uc.id;item.required_input_refs=uc.input_refs??[];item.fixture_constraints=(uc.guards??[]).map(g=>g.expression).filter(Boolean);item.fake_dependencies=uc.dependencies??[];}
       else item.unsupported.push(`无法定位 Scenario 对应 Use Case: ${behavior??'<missing>'}`);
-    }else if(v.kind==='state_transition'){
+    }else if(['state_transition','forbidden_state_transition'].includes(v.kind)){
       item.target_kind='state_transition';item.unsupported.push('状态迁移执行器尚未生成，保留测试计划');
     }else{
       item.unsupported.push(`当前 Target Test Compiler 尚未实现 kind=${v.kind}`);
