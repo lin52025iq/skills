@@ -4,12 +4,9 @@
   "title": "实现中间表示 IIR v0.2",
   "type": "object",
   "required": ["iir"],
-  "properties": {
-    "iir": { "$ref": "#/$defs/root" }
-  },
+  "properties": { "iir": { "$ref": "#/$defs/root" } },
   "additionalProperties": false,
   "$defs": {
-    "semanticId": { "type": "string", "minLength": 3 },
     "unresolved": {
       "type": "object",
       "required": ["semantic_ref", "reason", "severity"],
@@ -21,6 +18,27 @@
       },
       "additionalProperties": false
     },
+    "domainTypes": {
+      "type": "object",
+      "required": ["enums", "entities"],
+      "properties": {
+        "enums": { "type": "array" },
+        "entities": { "type": "array" }
+      },
+      "additionalProperties": false
+    },
+    "runtimeBinding": {
+      "type": "object",
+      "required": ["semantic_ref", "kind", "slot"],
+      "properties": {
+        "semantic_ref": { "type": "string" },
+        "kind": { "enum": ["entity", "field"] },
+        "slot": { "type": "string" },
+        "entity_ref": { "type": "string" },
+        "path": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
     "useCase": {
       "type": "object",
       "required": ["id", "kind", "semantic_refs", "guards", "steps", "dependencies"],
@@ -28,11 +46,14 @@
         "id": { "type": "string" },
         "kind": { "const": "use_case" },
         "semantic_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "name": { "type": "string" },
+        "input_refs": { "type": "array", "items": { "type": "string" } },
         "inputs": { "type": "array" },
         "guards": { "type": "array" },
         "steps": { "type": "array" },
         "outputs": { "type": "array" },
         "failure_refs": { "type": "array", "items": { "type": "string" } },
+        "postconditions": { "type": "array", "items": { "type": "string" } },
         "dependencies": { "type": "array", "items": { "type": "string" } }
       },
       "additionalProperties": true
@@ -44,6 +65,7 @@
         "id": { "type": "string" },
         "kind": { "const": "repository_contract" },
         "entity_ref": { "type": "string" },
+        "semantic_refs": { "type": "array", "items": { "type": "string" } },
         "operations": { "type": "array" },
         "binding": { "type": "object" }
       },
@@ -56,6 +78,7 @@
         "id": { "type": "string" },
         "kind": { "const": "external_port" },
         "system": { "type": "string" },
+        "semantic_refs": { "type": "array", "items": { "type": "string" } },
         "operations": { "type": "array" },
         "generation_mode": { "enum": ["contract_only", "handwritten", "verified_binding"] }
       },
@@ -94,13 +117,15 @@
     },
     "root": {
       "type": "object",
-      "required": ["version", "source_clm_id", "source_clm_version", "target_profile", "use_cases", "repository_contracts", "external_ports", "transaction_plans", "concurrency_plans", "retry_plans", "idempotency_plans", "error_mappings", "primitive_bindings", "generation_regions", "traceability", "unresolved"],
+      "required": ["version", "source_clm_id", "source_clm_version", "target_profile", "domain_types", "runtime_bindings", "use_cases", "repository_contracts", "external_ports", "transaction_plans", "concurrency_plans", "retry_plans", "idempotency_plans", "error_mappings", "primitive_bindings", "generation_regions", "traceability", "unresolved"],
       "properties": {
         "version": { "const": "0.2" },
         "source_clm_id": { "type": "string" },
         "source_clm_version": { "type": ["string", "integer"] },
         "source_semantic_hash": { "type": ["string", "null"] },
         "target_profile": { "type": "object" },
+        "domain_types": { "$ref": "#/$defs/domainTypes" },
+        "runtime_bindings": { "type": "array", "items": { "$ref": "#/$defs/runtimeBinding" } },
         "use_cases": { "type": "array", "items": { "$ref": "#/$defs/useCase" } },
         "repository_contracts": { "type": "array", "items": { "$ref": "#/$defs/repositoryContract" } },
         "external_ports": { "type": "array", "items": { "$ref": "#/$defs/externalPort" } },
