@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/logic-engineering/target-profile-v0.1.schema.json",
+  "title": "Logic Engineering Target Profile v0.1",
+  "type": "object",
+  "required": ["target_profile"],
+  "properties": {
+    "target_profile": { "$ref": "#/$defs/profile" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "semanticId": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]+$"
+    },
+    "sqlIdentifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "persistenceMapping": {
+      "type": "object",
+      "required": ["table", "primary_key", "columns"],
+      "properties": {
+        "table": { "$ref": "#/$defs/sqlIdentifier" },
+        "primary_key": { "$ref": "#/$defs/semanticId" },
+        "columns": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/sqlIdentifier" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "required": ["id", "language", "runtime", "persistence", "test_framework"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "language": { "type": "string", "minLength": 1 },
+        "version": { "type": ["string", "number"] },
+        "runtime": { "type": "string", "minLength": 1 },
+        "framework": { "type": "string" },
+        "architecture": { "type": "string" },
+        "persistence": { "type": "string", "minLength": 1 },
+        "persistence_generation": { "enum": ["contract_only", "explicit_mapping"] },
+        "persistence_mappings": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/persistenceMapping" }
+        },
+        "messaging": { "type": "string" },
+        "transaction_strategy": { "type": "string" },
+        "concurrency_strategy": { "type": "string" },
+        "retry_strategy": { "type": "string" },
+        "idempotency_strategy": { "type": "string" },
+        "error_model": { "type": "string" },
+        "test_framework": { "type": "string", "minLength": 1 },
+        "binding_key": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
