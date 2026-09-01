@@ -2,9 +2,7 @@
 
 `logic-engineering` 的主执行工具链统一使用 **Node.js 20+**。
 
-本 Skill 的确定性工具目前 **零 npm 运行时依赖**：不要求 Python，也不要求先执行 `npm install`。
-
-生成出来的 TypeScript 项目如果要执行真实 `tsc + Vitest` Gate，则按生成目录中的 `package.json` 准备 TypeScript/Vitest。
+本 Skill 的确定性工具本身保持零 npm 运行时依赖；生成出来的 TypeScript 项目只有在执行真实 `tsc + Vitest` Gate 时才需要安装对应开发依赖。
 
 ## 1. 主要入口
 
@@ -22,46 +20,48 @@ node scripts/run_pipeline.mjs model.json \
 npm run regression
 ```
 
-通用 CLM CLI：
+## 2. 三类 Validator
 
-```bash
-node scripts/logic_cli.mjs <command> ...
-```
-
-## 2. Schema Gate
-
-CLM：
+结构 Schema：
 
 ```bash
 node scripts/schema_validate.mjs model.json schemas/clm-v0.2.schema.json
 ```
 
-Target Profile：
+CLM 语义：
 
 ```bash
-node scripts/schema_validate.mjs target-profile.json schemas/target-profile-v0.1.schema.json
+node scripts/validate_clm.mjs model.json
 ```
 
-IIR：
+IIR 语义：
 
 ```bash
-node scripts/schema_validate.mjs implementation.iir.json schemas/iir-v0.2.schema.json
+node scripts/validate_iir.mjs implementation.iir.json
 ```
 
-内置零依赖 Schema Validator 覆盖当前 Schema 使用的 `$ref / allOf / oneOf / if-then-else / type / required / properties / additionalProperties / items / enum / const / pattern / minLength / minItems / maxItems / uniqueItems / minProperties / maxProperties`。
+CLM 与 IIR Validator 都已经从通用 CLI 拆出，禁止恢复重复实现。
 
-## 3. 通用 CLI 子命令
+## 3. 通用 CLI
+
+`logic_cli.mjs` 只承担轻量语言无关操作：
 
 ```text
-validate-clm     校验 CLM 语义
-symbols          生成 Symbol Table
-hash             计算 Semantic Hash
-render           生成中文逻辑投影
-test-vectors     生成语言无关 Test Vector
-verify-manifest  校验 generated artifact 漂移
+symbols          Symbol Table
+hash             Semantic Hash
+render           中文逻辑投影
+test-vectors     语言无关 Test Vector
+verify-manifest  Generated artifact 漂移检查
 ```
 
-IIR、Target Test 与 IIR Validator 已拆成独立工具，不再嵌入通用 CLI：
+例如：
+
+```bash
+node scripts/logic_cli.mjs render model.json -o human-logic.md
+node scripts/logic_cli.mjs test-vectors model.json -o test-vectors.json
+```
+
+## 4. 编译链
 
 ```bash
 node scripts/compile_iir.mjs model.json target-profile.json -o implementation.iir.json
@@ -69,23 +69,20 @@ node scripts/validate_iir.mjs implementation.iir.json
 node scripts/compile_target_tests.mjs test-vectors.json implementation.iir.json -o target-test-plan.json
 ```
 
-## 4. Target Profile
-
-Target Profile 是一等实现契约，详见 `references/target-profile-v0.1.md`。
-
-当前 SQLite 使用 `persistence_generation=explicit_mapping` 时，table / primary key / columns 必须显式给出。
+当前 CLM/IIR 已支持：
 
 ```text
-Schema valid
-→ 仅表示配置形状合法
-
-IIR valid
-→ 表示该 Profile 对当前 CLM 的必要 mapping/策略已经满足
+Typed Guard / Assignment
+Decision → then_steps / else_steps
+Foreach → typed scoped item
+Structured list/object Scenario
+Atomicity → transaction plan
+显式 SQLite persistence mapping
 ```
 
-缺失字段 mapping 时进入 blocking unresolved，不能继续生成 SQL。
+## 5. TypeScript + SQLite Adapter
 
-## 5. TypeScript Target Adapter
+基础业务实现：
 
 ```bash
 node scripts/generate_typescript_v02.mjs \
@@ -94,34 +91,67 @@ node scripts/generate_typescript_v02.mjs \
   -o generated-ts
 ```
 
-当前支持：
+事务层：
 
-```text
-Typed Guard / Assignment
-Decision → if/else
-Foreach → for...of + scoped item
-显式 SQLite mapping → 稳定 upsert Repository Adapter
+```bash
+node scripts/generate_typescript_transactions.mjs \
+  implementation.iir.json \
+  generated-ts
 ```
 
-生成后固定执行两个零依赖 Gate：
+统一流水线会自动按这个顺序执行。
+
+当前生成能力包括：
+
+```text
+Rule Guard → TypeScript boolean function
+Typed Assignment → 属性赋值
+Decision → if/else
+Foreach → for...of + scoped item
+list/object Scenario → 数组/对象 fixture + toEqual
+explicit SQLite mapping → INSERT ... ON CONFLICT upsert
+Atomicity full_behavior → Transactional Use Case wrapper
+sqlite_transaction → BEGIN IMMEDIATE / COMMIT / ROLLBACK runner
+```
+
+## 6. Generated Gate
+
+生成后固定执行：
 
 ```bash
 node scripts/logic_cli.mjs verify-manifest generated-ts
 node scripts/validate_generated_typescript.mjs generated-ts
 ```
 
-如果环境已具备 `tsc` 与 `vitest`，再执行：
+有 `tsc` / `vitest` 时进一步：
 
 ```bash
 node scripts/verify_typescript.mjs generated-ts
 ```
 
-工具不存在时返回 `TOOL_UNAVAILABLE`，不会把未执行描述成已通过。
+工具不存在时必须报告 `TOOL_UNAVAILABLE`，不能描述成已通过。
 
-## 6. 独立 Node 脚本
+## 7. Target Profile
+
+Target Profile 是一等实现契约，详见 `references/target-profile-v0.1.md`。
+
+当前 SQLite Profile 支持：
+
+```text
+persistence_generation = explicit_mapping
+transaction_strategy    = sqlite_transaction
+transaction_scope       = full_behavior
+```
+
+Table / primary key / columns 必须显式配置。
+
+事务 wrapper 与 Repository Adapter 必须绑定同一 SQLite transaction/session context。
+
+## 8. 独立 Node 脚本
 
 ```text
 schema_validate.mjs
+validate_clm.mjs
 apply_patch.mjs
 apply_change_set.mjs
 analyze_impact.mjs
@@ -130,22 +160,25 @@ compile_iir.mjs
 validate_iir.mjs
 compile_target_tests.mjs
 generate_typescript_v02.mjs
+generate_typescript_transactions.mjs
 validate_generated_typescript.mjs
 verify_typescript.mjs
 run_pipeline.mjs
 run_v02_regression.mjs
 run_sqlite_regression.mjs
 run_sqlite_mapping_negative.mjs
+run_transaction_regression.mjs
 ```
 
-公共模块：`scripts/lib/model.mjs`。
+公共模型：`scripts/lib/model.mjs`。
 
-## 7. 回归拆分
+## 9. 回归拆分
 
 ```text
 npm run regression:core
 npm run regression:sqlite
 npm run regression:sqlite-negative
+npm run regression:transaction
 ```
 
 总入口：
@@ -154,27 +187,10 @@ npm run regression:sqlite-negative
 npm run regression
 ```
 
-回归按能力拆分，避免单个脚本无限膨胀。
+## 10. 运行时原则
 
-## 8. 首个参考目标
-
-```text
-TypeScript 5.x
-Node.js
-SQLite
-Vitest
-framework-agnostic
-```
-
-Reference Target 只验证目标实现投影，不改变 CLM / IIR 的语言无关设计。
-
-## 9. 运行时原则
-
-- 公共结构、Node Registry、Symbol Table、Semantic Hash 与 scoped-ref 解析集中在 `scripts/lib/model.mjs`；
-- 通用 CLI 不包含 IIR 编译、IIR Validator 或目标语言生成逻辑；
-- IIR / Target Test 使用独立编译器；
-- Target Adapter 独立扩展；
-- 新增确定性工具默认使用 Node.js；
-- 不长期维护 Python/Node、旧/新 Generator 或重复 Validator；
-- 旧实现迁移完成后直接删除；
-- SQLite 只属于当前 Target Profile，不进入领域语义。
+- Node Registry、Symbol Table、Semantic Hash、scoped-ref 和 Typed Value 公共行为集中在 `scripts/lib/model.mjs`；
+- Validator、Compiler、Target Adapter 各自独立，不在通用 CLI 中维护第二套实现；
+- 替代完成的旧实现直接删除；
+- SQLite/Node.js/TypeScript 只属于 Target 层，不进入 CLM 领域语义；
+- Generator 遇到未支持或不确定语义必须阻断或输出明确 unsupported，不得猜测。
