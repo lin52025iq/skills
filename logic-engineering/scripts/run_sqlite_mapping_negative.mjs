@@ -15,7 +15,7 @@ const iirFile=path.join(tmp,'iir.json');
 let ok=true;
 ok=run('schema_validate.mjs',[profile,path.join(SCHEMAS,'target-profile-v0.1.schema.json')])&&ok;
 ok=run('compile_iir.mjs',[model,profile,'-o',iirFile])&&ok;
-ok=run('logic_cli.mjs',['validate-iir',iirFile],1)&&ok;
+ok=run('validate_iir.mjs',[iirFile],1)&&ok;
 let detected=false;
 try{
   const unresolved=readJson(iirFile).iir?.unresolved??[];
