@@ -9,6 +9,9 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Set, Tuple
 
+from clm_model import build_node_index, iter_node_values, root_of
+from expression_ast import iter_refs
+
 
 PROPAGATING_RELATIONS = {
     "REQUIRES",
@@ -29,7 +32,12 @@ DERIVED_BY_KIND = {
     "behavior": {"human_projection", "scenario_tests", "target_iir", "generated_code"},
     "decision": {"human_projection", "scenario_tests", "target_iir", "generated_code"},
     "action": {"human_projection", "scenario_tests", "target_iir", "generated_code"},
+    "foreach": {"human_projection", "scenario_tests", "target_iir", "generated_code"},
     "effect": {"target_iir", "generated_code", "integration_tests"},
+    "read": {"target_iir", "generated_code", "integration_tests"},
+    "write": {"target_iir", "generated_code", "integration_tests"},
+    "external_call": {"target_iir", "generated_code", "integration_tests"},
+    "emit": {"target_iir", "generated_code", "integration_tests"},
     "state_machine": {"human_projection", "state_tests", "target_iir", "generated_code"},
     "transition": {"human_projection", "state_tests", "target_iir", "generated_code"},
     "constraint": {"human_projection", "property_tests", "formal_projection"},
@@ -46,25 +54,6 @@ def load_json(path: Path) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def iter_nodes(clm: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
-    root = clm.get("clm", clm)
-    for section in (
-        "domain",
-        "behaviors",
-        "rules",
-        "decisions",
-        "actions",
-        "states",
-        "effects",
-        "constraints",
-        "scenarios",
-        "primitives",
-    ):
-        for node in root.get(section, []) or []:
-            if isinstance(node, dict) and node.get("id"):
-                yield node
-
-
 def add_ref(reverse: Dict[str, List[Tuple[str, str]]], target: Any, source: str, reason: str) -> None:
     if isinstance(target, str) and target:
         reverse[target].append((source, reason))
@@ -74,20 +63,13 @@ def add_ref(reverse: Dict[str, List[Tuple[str, str]]], target: Any, source: str,
 
 
 def collect_expr_refs(expr: Any, reverse: Dict[str, List[Tuple[str, str]]], source: str, reason: str) -> None:
-    if isinstance(expr, dict):
-        ref = expr.get("ref")
-        if isinstance(ref, str):
-            add_ref(reverse, ref, source, reason)
-        for value in expr.values():
-            collect_expr_refs(value, reverse, source, reason)
-    elif isinstance(expr, list):
-        for item in expr:
-            collect_expr_refs(item, reverse, source, reason)
+    for ref in iter_refs(expr):
+        reverse[ref].append((source, reason))
 
 
 def build_reverse_dependencies(clm: Dict[str, Any]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, List[Tuple[str, str]]]]:
-    root = clm.get("clm", clm)
-    nodes = {node["id"]: node for node in iter_nodes(clm)}
+    root = root_of(clm)
+    nodes = build_node_index(clm)
     reverse: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
 
     for rel in root.get("relations", []) or []:
@@ -120,12 +102,15 @@ def build_reverse_dependencies(clm: Dict[str, Any]) -> Tuple[Dict[str, Dict[str,
             add_ref(reverse, node.get("transitions"), node_id, "StateMachine.transitions 引用")
         elif kind == "transition":
             add_ref(reverse, node.get("trigger"), node_id, "Transition.trigger 引用")
+            collect_expr_refs(node.get("guard"), reverse, node_id, "Transition.guard 引用")
         elif kind == "scenario":
             add_ref(reverse, node.get("when"), node_id, "Scenario.when 引用")
         elif kind == "rule":
             add_ref(reverse, node.get("subject"), node_id, "Rule.subject 引用")
             collect_expr_refs(node.get("expression"), reverse, node_id, "Rule.expression 引用")
             collect_expr_refs(node.get("conditions"), reverse, node_id, "Rule.conditions 引用")
+        elif kind in {"constraint", "invariant", "precondition", "postcondition"}:
+            collect_expr_refs(node.get("expression"), reverse, node_id, "Constraint.expression 引用")
 
     return nodes, reverse
 
@@ -156,11 +141,8 @@ def analyze(clm: Dict[str, Any], changed: List[str]) -> Dict[str, Any]:
             node = nodes.get(source)
             if node:
                 derived |= DERIVED_BY_KIND.get(node.get("kind"), set())
-                if node.get("kind") in {"enum", "entity", "value_type"}:
-                    review.append({"id": source, "reason": "领域模型变化可能产生未显式建模的遗漏 case，需要复核"})
             queue.append((source, depth + 1))
 
-    # Domain changes need conservative review of direct users and state/scenario completeness.
     for node_id in changed:
         node = nodes.get(node_id)
         if node and node.get("kind") in {"enum", "entity", "value_type"}:
@@ -173,9 +155,9 @@ def analyze(clm: Dict[str, Any], changed: List[str]) -> Dict[str, Any]:
     all_kinds = affected_kinds | changed_kinds
     if all_kinds & {"rule", "behavior", "decision", "scenario"}:
         revalidation.add("scenario_consistency")
-    if all_kinds & {"state_machine", "transition", "constraint"}:
+    if all_kinds & {"state_machine", "transition", "constraint", "invariant"}:
         revalidation.add("state_consistency")
-    if all_kinds & {"effect", "action", "primitive", "constraint"}:
+    if all_kinds & {"effect", "read", "write", "external_call", "action", "foreach", "primitive", "constraint"}:
         revalidation.add("implementation_mapping")
 
     return {
