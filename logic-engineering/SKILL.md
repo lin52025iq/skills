@@ -1,70 +1,69 @@
 ---
 name: logic-engineering
-description: 将现有项目中的模块级业务实现重建为与编程语言无关、可由人直接理解和修改的 Canonical Logic Model，并在逻辑层执行归一化、公共逻辑提取、状态与规则分析、Semantic Patch 修改、目标技术栈实现生成和一致性验证。适用于 logic-first 开发、旧代码逻辑导入、模块级自然语言解释、逻辑优化和跨语言重实现。
+description: 将现有项目中的模块级业务实现重建为与编程语言无关、可由人直接理解和修改的规范逻辑模型（Canonical Logic Model，CLM），并在逻辑层完成归一化、公共逻辑提取、状态与规则分析、语义补丁修改、目标技术栈实现生成和一致性验证。适用于逻辑优先开发、旧代码逻辑导入、模块级自然语言解释、逻辑优化和跨语言重实现。
 ---
 
-# Logic Engineering
+# 逻辑工程
 
 把软件开发视为 **逻辑模型的维护、验证与实现投影**，而不是直接维护某一种编程语言的源代码。
 
 ```text
-Existing Code / Human Requirement
-            ↓
-   Candidate Logic Model
-            ↓ confirm
-   Canonical Logic Model (CLM)
-      ┌─────┼──────────┐
-      ↓     ↓          ↓
- Human View Verify   Implement
-      ↓     ↓          ↓
- Natural   Formal    Target Code
- Logic     Checks     + Tests
+现有代码 / 人类需求
+        ↓
+   候选逻辑模型
+        ↓ 确认
+规范逻辑模型（CLM）
+   ┌────┼────────┐
+   ↓    ↓        ↓
+人类视图  验证     实现投影
+   ↓    ↓        ↓
+自然语言 形式检查   目标代码 + 测试
 ```
 
 ## 1. 核心原则
 
-1. **Logic is Source.** 业务逻辑的权威源是 Canonical Logic Model（CLM），不是散文式自然语言，也不是生成代码。
-2. **Natural Language is Projection.** 用户看到的是 CLM 的人类可读投影；自由自然语言不能静默成为 canonical 状态。
-3. **Free NL only proposes.** 用户以自由文本提出修改时，先产生 Semantic Patch Proposal，再决定是否应用。
-4. **Generated Code is output.** 完成 logic-first 接管后，业务修改回到 CLM；生成代码默认不作为人工修改入口。
-5. **Stable Semantic Identity.** Rule、Behavior、State、Constraint、Scenario 等都有稳定、语言无关、文件路径无关的 Semantic ID。
-6. **Traceability first.** Legacy import 必须区分 OBSERVED / INFERRED / ASSUMED / UNKNOWN，并绑定源代码证据。
-7. **LLM proposes; checks decide.** LLM 负责理解、提炼、建议和候选生成；schema、类型、约束、测试和 verifier 负责判定是否可接受。
-8. **Business and infrastructure separate.** CLM 描述事务、幂等、顺序、互斥、一致性等要求；具体框架和 API 进入 Implementation IR / Target Profile。
-9. **Tests derive from logic.** 测试从 CLM 独立生成，不从生成代码反推 expected behavior。
-10. **Do not silently change behavior.** Observed Logic 与 Intended Logic 必须分离；优化默认以 proposal 表达。
+1. **逻辑是事实源。** 业务逻辑的权威源是规范逻辑模型（CLM），不是散文式自然语言，也不是生成代码。
+2. **自然语言是人类投影。** 用户看到的是 CLM 的人类可读视图；自由自然语言不能静默成为规范状态。
+3. **自由文本只产生提案。** 用户以自由文本提出修改时，先生成语义补丁提案（Semantic Patch Proposal），再决定是否应用。
+4. **生成代码是输出。** 完成逻辑优先接管后，业务修改回到 CLM；生成代码默认不作为人工修改入口。
+5. **每条语义都有稳定标识。** 规则、行为、状态、约束、场景等必须有与语言和文件路径无关的语义 ID。
+6. **证据优先。** 旧代码导入必须区分“已观察 / 推断 / 假设 / 未知”，并绑定源代码证据。
+7. **模型提出，确定性机制裁决。** 大模型负责理解、提炼、建议和候选生成；结构校验、类型检查、约束检查、测试和验证器负责判定是否可接受。
+8. **业务语义与基础设施分离。** CLM 描述事务、幂等、顺序、互斥、一致性等要求；具体框架和 API 进入实现中间表示（IIR）和目标配置。
+9. **测试从逻辑派生。** 测试从 CLM 独立生成，不从生成代码反推预期行为。
+10. **忠实解释与逻辑优化分离。** 已观察逻辑与期望逻辑必须分开；优化默认先以提案表达，禁止在解释阶段偷偷改变业务行为。
 
 ## 2. 工作模式
 
-根据用户目标选择一个或多个 mode：
+根据用户目标选择一个或多个模式：
 
 ```text
-import      Existing Code → Candidate CLM
-explain     Existing Code / CLM → Human-readable Logic
-normalize   Faithful Logic → lossless normalized CLM
-optimize    CLM → Optimization Proposal / Semantic Patch
-edit        Human change → Semantic Patch → CLM
-migrate     CLM → Target Profile → Implementation
-verify      CLM ↔ implementation / tests / formal checks
+导入（import）       现有代码 → 候选 CLM
+解释（explain）      现有代码 / CLM → 人类可读逻辑
+归一化（normalize）  忠实逻辑 → 不改变行为的规范化 CLM
+优化（optimize）     CLM → 优化提案 / 语义补丁
+编辑（edit）         人类修改 → 语义补丁 → CLM
+迁移（migrate）      CLM → 目标配置 → 目标实现
+验证（verify）       CLM ↔ 实现 / 测试 / 形式检查
 ```
 
-`import` 是已有项目进入 logic-first 工作流的入口；`edit / optimize / migrate` 应以已确认 CLM 为事实源。
+`import` 是已有项目进入逻辑优先工作流的入口；`edit / optimize / migrate` 应以已经确认的 CLM 为事实源。
 
-## 3. Canonical Logic Model
+## 3. 规范逻辑模型（CLM）
 
-CLM 是 typed semantic graph。第一版至少支持七类节点：
+CLM 是带类型的语义图。第一版至少支持七类节点：
 
 ```text
-Domain      Entity / ValueType / Enum / Relationship
-Behavior    Purpose / Input / Flow / Decision / Output / Failure
-State       State / Transition / Forbidden Transition
-Effect      Read / Write / External Call / Emit / Persist
-Constraint  Precondition / Postcondition / Invariant / Temporal / Concurrency
-Scenario    Given / When / Then / Boundary Example
-Primitive   language-independent technical capability contract
+领域       实体 / 值类型 / 枚举 / 关系
+行为       目的 / 输入 / 流程 / 判断 / 输出 / 失败
+状态       状态 / 状态迁移 / 禁止迁移
+影响       读取 / 写入 / 外部调用 / 发布事件 / 持久化
+约束       前置条件 / 后置条件 / 不变量 / 时序 / 并发
+场景       前置场景 / 操作 / 结果 / 边界示例
+基础能力   与语言无关的技术能力契约
 ```
 
-常用关系：
+常用关系的机器标识可以保留英文：
 
 ```text
 REQUIRES       INVOKES        READS          WRITES
@@ -74,9 +73,9 @@ CONSTRAINED_BY USES_PRIMITIVE DERIVED_FROM  EVIDENCED_BY
 
 详细结构见 `references/canonical-logic-model.md`。
 
-## 4. Semantic ID
+## 4. 语义 ID
 
-Semantic ID 必须与实现名称解耦。例如：
+语义 ID 必须与具体实现名称解耦。例如：
 
 ```text
 domain.order
@@ -90,86 +89,86 @@ scenario.order.cancel.pending_payment
 primitive.transaction.atomic_group
 ```
 
-不要把 Java 类名、Go 文件路径或 Rust module path 当作 canonical ID；实现位置通过 trace mapping 关联。
+不要把 Java 类名、Go 文件路径或 Rust 模块路径当作规范 ID；实现位置通过追踪映射关联。
 
-## 5. Existing Code → Candidate CLM
+## 5. 现有代码 → 候选 CLM
 
-对模块进行逆向理解时，不以当前文件为边界。
+逆向理解模块时，不以当前文件为边界。
 
 ```text
-Target Question / Module
-        ↓
-Locate Entry Points
-        ↓
-Skeleton Discovery
-        ↓
-Best-first Expansion
-        ↓
-Logic Facts + Evidence
-        ↓
-Candidate Logic Graph
-        ↓
-Candidate CLM + Human Projection
+目标问题 / 模块
+      ↓
+定位入口
+      ↓
+发现主要骨架
+      ↓
+按优先级继续展开
+      ↓
+提取逻辑事实 + 证据
+      ↓
+候选逻辑图
+      ↓
+候选 CLM + 人类可读投影
 ```
 
-### 5.1 应继续追踪
+### 5.1 需要继续追踪的内容
 
 当下列依赖会实质改变目标功能解释时继续定位：
 
-- business/domain services
-- validators / authorization
-- state transitions
-- special persistence / transaction semantics
-- events / handlers / queues
-- retry / fallback / idempotency
-- external service adapters
-- runtime/config-driven dispatch
+- 业务服务与领域规则；
+- 校验和权限；
+- 状态变化；
+- 特殊持久化与事务语义；
+- 事件、消费者、队列与异步任务；
+- 重试、降级和幂等；
+- 外部服务适配器；
+- 由配置或运行时决定的动态分派。
 
-通常不深入 logging、trivial getter/setter、plain DTO mapping、无业务影响 wrapper、框架内部普通实现。
+通常不深入日志、简单 getter/setter、普通 DTO 映射、无业务影响的包装函数和框架内部常规实现。
 
-优先 **breadth-first skeleton discovery + best-first expansion**，避免从首个调用一路深挖到底。
+优先采用 **先广度发现骨架，再按重要性展开**，避免从第一个调用一路深挖到底。
 
-### 5.2 Open Question 驱动
+### 5.2 由开放问题驱动探索
 
 探索必须维护：
 
 ```text
-completed_nodes
-frontier
-open_questions
-hypotheses
-contradictions
-unresolved_dynamic_edges
+已完成节点
+待探索边界
+开放问题
+当前假设
+已发现矛盾
+尚未解析的动态关系
 ```
 
-继续读取代码前先回答：“当前要关闭哪个 open question？”
+继续读取代码前先回答：“当前要关闭哪个开放问题？”
 
-### 5.3 Evidence 分类
+### 5.3 证据分类
 
 ```text
-OBSERVED  源代码直接证明
-INFERRED  多个 observed fact 合成
-ASSUMED   依赖未验证的框架/运行时语义
-UNKNOWN   当前证据不足
+已观察（OBSERVED）  源代码直接证明
+推断（INFERRED）    多个已观察事实组合得到
+假设（ASSUMED）     依赖尚未验证的框架或运行时语义
+未知（UNKNOWN）     当前证据不足
 ```
 
-ASSUMED / UNKNOWN 不得静默升级成 canonical rule。
+“假设 / 未知”不得静默升级为规范业务规则。
 
-Legacy import 默认先建立 **Observed Behavior Model**；人或已有明确规范确认后，才建立 Intended Logic / Canonical CLM。
+旧代码导入默认先建立 **已观察行为模型**；只有在人或已有权威规范确认后，才形成 **期望逻辑 / 规范 CLM**。
 
 详见 `references/legacy-import.md`。
 
-## 6. Human-readable Logic
+## 6. 人类可读逻辑
 
-同一个 CLM 至少提供三层自然语言投影：
+同一个 CLM 至少提供三层自然语言视图：
 
 ```text
-Business View         业务效果与核心规则
-Logic View            条件、步骤、分支、状态变化、失败情况
-Technical Logic View  事务、并发、幂等、重试、事件顺序、一致性
+业务视图      业务效果和核心规则
+逻辑视图      条件、步骤、分支、状态变化、失败情况
+技术逻辑视图  事务、并发、幂等、重试、事件顺序、一致性
 ```
 
-例如：
+示例：
 
 ```text
 功能：取消订单
@@ -192,9 +191,9 @@ Technical Logic View  事务、并发、幂等、重试、事件顺序、一致�
 - 已取消订单不能再进入发货流程。
 ```
 
-Human Projection 只能重排和解释 CLM，不能引入 CLM 中不存在的新业务规则。
+人类投影只能重排和解释 CLM，不能引入 CLM 中不存在的新业务规则。
 
-## 7. Structured Editing 与自由文本修改
+## 7. 结构化编辑与自由文本修改
 
 生产级修改以结构化语义节点为中心。
 
@@ -220,34 +219,34 @@ values = [PENDING_PAYMENT, PENDING_SHIPMENT]
 待接单订单以后也允许取消。
 ```
 
-先生成 Semantic Patch Proposal：
+先生成语义补丁提案：
 
 ```text
-Target: rule.order.cancel.allowed_status
-Operation: ADD_MEMBER
-Value: PENDING_ACCEPTANCE
+目标：rule.order.cancel.allowed_status
+操作：ADD_MEMBER
+新增值：PENDING_ACCEPTANCE
 ```
 
-## 8. Semantic Patch
+## 8. 语义补丁（Semantic Patch）
 
-用户修改、Agent 优化、legacy 修复最终统一表示为 Semantic Patch。
+用户修改、Agent 优化、旧代码修复最终统一表示为语义补丁。
 
 至少包含：
 
 ```text
-patch_id
-intent
-target_semantic_id
-operation
-before
-after
-reason
-behavior_change_level
-affected_semantic_nodes
-verification_required
+补丁 ID
+修改意图
+目标语义 ID
+操作
+修改前
+修改后
+原因
+行为变化级别
+受影响的语义节点
+需要执行的验证
 ```
 
-支持：
+机器操作标识支持：
 
 ```text
 ADD_NODE / REMOVE_NODE / UPDATE_FIELD
@@ -261,49 +260,49 @@ ADD_CONSTRAINT / UPDATE_CONSTRAINT
 
 ## 9. 逻辑优化
 
-优化作用于 CLM，不直接改 generated code。
+优化只作用于 CLM 或产生语义补丁提案，不直接修改生成代码。
 
-### O1 Lossless Normalization
+### O1 无损归一化
 
 不改变行为：
 
-- 判断按语义分组
-- branch / guard 归一化
-- Decision Table 重建
-- State Machine 重建
-- 命名与概念统一
+- 将多个判断按语义分组；
+- 统一分支和提前返回的逻辑表达；
+- 重建决策表；
+- 重建状态机；
+- 统一命名与领域概念。
 
-### O2 Behavior-preserving Refactoring
+### O2 行为保持重构
 
 预期业务行为不变：
 
-- 公共验证提取
-- 公共 rule / flow 提取
-- 重复逻辑消除
-- 条件结构简化
+- 提取公共验证；
+- 提取公共规则或公共流程；
+- 消除重复逻辑；
+- 简化条件结构。
 
-必须做 semantic equivalence verification。
+必须验证语义等价性。
 
-### O3 Robustness Improvement
+### O3 稳健性优化
 
-通常不改变业务意图，但改变技术可靠性：
+通常不改变业务意图，但会改变技术可靠性：
 
-- transaction boundary
-- retry
-- idempotency
-- concurrency protection
-- reliable event publication
+- 调整事务边界；
+- 增加重试；
+- 增加幂等；
+- 增加并发保护；
+- 增强事件可靠投递。
 
-必须明确列出实现语义变化。
+必须明确列出技术行为变化。
 
-### O4 Business Behavior Change
+### O4 业务行为修改
 
 真正改变业务规则：
 
-- 新增/删除允许状态
-- 修改权限
-- 修改价格、退款等业务规则
-- 补充缺失业务分支
+- 新增或删除允许状态；
+- 修改权限；
+- 修改价格、退款等业务规则；
+- 补充缺失业务分支。
 
 默认需要明确确认。
 
@@ -311,71 +310,69 @@ ADD_CONSTRAINT / UPDATE_CONSTRAINT
 
 重点检查：
 
-```text
-missing case
-branch overlap
-unreachable branch
-contradicting rules
-invalid state transition
-invariant violation
-side-effect ordering risk
-transaction gap
-non-idempotent retry path
-concurrency race candidate
-inconsistent duplicate rules
-```
+- 分支缺失；
+- 分支重叠；
+- 永远不可达的分支；
+- 相互矛盾的规则；
+- 非法状态迁移；
+- 不变量被破坏；
+- 副作用顺序风险；
+- 事务边界缺口；
+- 重试路径不幂等；
+- 潜在并发竞争；
+- 重复规则之间不一致。
 
-没有明确业务证据时必须使用 `potential`，不要把个人设计偏好描述成确定 bug。
+没有明确业务证据时必须使用“潜在问题”，不要把个人设计偏好描述成确定缺陷。
 
 ## 10. 公共逻辑提取
 
 公共逻辑不能只根据文本相似度判断。至少比较：
 
 ```text
-semantic equivalence
-same domain meaning
-same pre/postconditions
-same effects
-likely change coupling
+语义是否等价
+领域含义是否相同
+前置/后置条件是否一致
+副作用是否一致
+未来是否大概率一起变化
 ```
 
-确认后创建公共 Semantic Node，让各 Behavior 通过引用复用，而不是复制自然语言文本。
+确认后创建公共语义节点，让各行为通过引用复用，而不是复制自然语言文本。
 
-## 11. Target Implementation
+## 11. 目标实现投影
 
 生成链路：
 
 ```text
 CLM
  ↓
-Target Profile
+目标配置
  ↓
-Primitive Binding
+基础能力绑定
  ↓
-Implementation IR (IIR)
+实现中间表示（IIR）
  ↓
-Target Code Generator
+目标代码生成
 ```
 
-Target Profile 至少描述：
+目标配置至少描述：
 
 ```text
-language / version
-framework
-architecture
-persistence
-messaging
-dependency injection
-transaction strategy
-error model
-test framework
+语言与版本
+框架
+架构风格
+持久化方式
+消息系统
+依赖注入方式
+事务策略
+错误模型
+测试框架
 ```
 
-不要把源语言技术语法机械翻译。例如 `synchronized` 应先恢复为“同一资源修改必须互斥”的语义要求，再由目标 Profile 选择锁实现。
+不要把源语言技术语法机械翻译。例如 `synchronized` 应先恢复为“同一资源修改必须互斥”的语义要求，再由目标配置选择锁实现。
 
-## 12. Primitive Library
+## 12. 基础能力库（Primitive Library）
 
-复杂底层能力以 Primitive contract 提供，例如：
+复杂底层能力通过“基础能力契约”暴露，例如：
 
 ```text
 transaction.atomic_group
@@ -386,132 +383,132 @@ payment.charge
 crypto.verify_signature
 ```
 
-Primitive 应描述：
+每个基础能力应描述：
 
 ```text
-human description
-input/output contract
-pre/postconditions
-effects
-failure semantics
-idempotency / atomicity properties
-per-target implementation binding
-verification / tests
+人类说明
+输入/输出契约
+前置/后置条件
+副作用
+失败语义
+幂等/原子性性质
+各目标技术栈绑定
+验证与测试
 ```
 
-CLM 使用 Primitive，不复制底层代码细节。
+CLM 使用基础能力，不复制其底层代码细节。
 
-## 13. Verification
+## 13. 验证
 
 建议分层：
 
 ```text
-L0 Schema / type validity
-L1 Internal semantic consistency
-L2 Implementation conformance
-L3 Scenario / boundary / property tests
-L4 Formal verification for selected properties
-L5 Human confirmation of business intent
+L0 结构与类型合法
+L1 模型内部语义一致
+L2 实现符合 CLM
+L3 场景 / 边界 / 性质测试
+L4 对关键性质进行形式化验证
+L5 人确认业务意图正确
 ```
 
-根据语义选择验证后端，而不是要求单一工具验证所有性质：
+根据语义类型选择验证后端，不要求单一工具验证所有性质：
 
 ```text
-function contracts     → SMT / Dafny / Why3 类工具
-state transitions      → state model checking
-concurrency / temporal → TLA+/LTL 类工具
-examples               → unit/integration tests
-invariants             → property tests + optional proof
+函数契约       → SMT / Dafny / Why3 类工具
+状态迁移       → 状态模型检查
+并发 / 时序    → TLA+ / LTL 类工具
+业务场景       → 单元测试 / 集成测试
+不变量         → 性质测试 + 可选形式证明
 ```
 
-生成代码后可重新抽取 Observable Semantic Model，与 CLM 的 conditions、state writes、external effects、ordering、errors 比较。Round-trip 是额外防线，不替代独立测试。
+生成代码后可以重新抽取“可观察语义模型”，与 CLM 的条件、状态写入、外部副作用、执行顺序和错误行为比较。语义往返检查是额外防线，不替代独立测试。
 
 详见 `references/verification-and-generation.md`。
 
-## 14. Tests 从 CLM 派生
+## 14. 测试从 CLM 派生
 
 ```text
-Scenario        → example tests
-Condition       → boundary tests
-Invariant       → property tests
-State Machine   → transition tests
-Temporal Rule   → integration/runtime monitor
+场景       → 示例测试
+条件       → 边界测试
+不变量     → 性质测试
+状态机     → 状态迁移测试
+时序规则   → 集成测试 / 运行时监控
 ```
 
 例如：
 
 ```text
-Rule: amount <= payment_limit
+规则：amount <= payment_limit
 ```
 
 至少派生：
 
 ```text
-amount = limit - 1 → allowed
-amount = limit     → allowed
-amount = limit + 1 → rejected
+amount = limit - 1 → 允许
+amount = limit     → 允许
+amount = limit + 1 → 拒绝
 ```
 
-## 15. Context Compression
+## 15. 上下文压缩
 
 大型模块分析使用：
 
 ```text
-L0 Source Evidence
+L0 源代码证据
  ↓
-L1 Logic Node Summary
+L1 逻辑节点摘要
  ↓
-L2 Sub-flow Summary
+L2 子流程摘要
  ↓
-L3 Candidate CLM / Human Logic
+L3 候选 CLM / 人类可读逻辑
 ```
 
-压缩后必须保留 evidence pointer；出现矛盾或需要验证时重新读取源代码。
+压缩后必须保留证据指针；出现矛盾或需要验证时重新读取源代码。
 
 ## 16. 停止条件
 
-Legacy exploration 满足以下条件即可停止主要路径扩展：
+旧代码探索满足以下条件即可停止主要路径扩展：
 
 ```text
-critical open questions resolved
-main execution / data / state path closed
-important effects identified
-important failures identified
-no unresolved dependency likely to change the explanation
+关键开放问题已经解决
+主要执行 / 数据 / 状态路径已经闭合
+重要副作用已经识别
+重要失败路径已经识别
+不存在大概率改变当前解释的未解析依赖
 ```
 
 单独分支若继续读取不会显著改变当前目标解释，可以提前停止。
 
-必要时设置 max_nodes / max_reads / max_depth 作为资源保险；达到预算时明确输出 Known / Unknown / Next Investigation，不伪装成已完整理解。
+必要时设置 `max_nodes / max_reads / max_depth` 作为资源保险；达到预算时明确输出“已知 / 未知 / 下一步需要调查”，不得伪装成已经完整理解。
 
 ## 17. 默认产出
 
-根据 mode 生成所需内容，常见产出：
+根据模式生成当前任务所需的最小充分集合：
 
 ```text
-Candidate / Canonical Logic Model
-Human-readable Logic
-Logic Graph / State Model / Decision Table
-Evidence Map
-Open Questions / Unknowns
-Optimization Proposals
-Semantic Patches
-Target Profile / Implementation IR
-Generated implementation plan
-Verification plan / test vectors
-Semantic Diff
+候选 / 规范逻辑模型
+人类可读逻辑
+逻辑图 / 状态模型 / 决策表
+证据映射
+开放问题 / 未知项
+优化提案
+语义补丁
+目标配置 / 实现中间表示
+目标实现计划
+验证计划 / 测试向量
+语义差异
 ```
 
-不要为了形式一次性生成所有产物；只生成当前目标所需的最小充分集合。
+不要为了形式一次性生成所有产物。
 
 ## 18. 禁止事项
 
 - 不把当前文件摘要当作模块完整逻辑。
 - 不把函数名直译当作业务解释。
-- 不把 ASSUMED 当 OBSERVED。
-- 不在“忠实翻译”阶段偷偷优化业务行为。
-- 不以 generated code 作为业务逻辑的反向事实源。
-- 不从 generated code 生成 expected tests。
-- 不把语言/框架特有语法写进 Canonical Domain Logic。
+- 不把“假设”当作“已观察”。
+- 不在忠实翻译阶段偷偷优化业务行为。
+- 不把生成代码作为业务逻辑的反向事实源。
+- 不从生成代码生成预期测试。
+- 不把语言或框架特有语法写进规范领域逻辑。
 - 不因为多个代码片段相似就强行抽公共规则。
-- 不宣称“逻辑正确即可数学保证任意实现正确”；必须说明实际验证层级。
+- 不宣称“逻辑正确即可数学保证任意实现正确”；必须说明实际使用的验证层级。
