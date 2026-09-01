@@ -1,4 +1,4 @@
 interface:
   display_name: "代码迁移"
   short_description: "基于真实源证据、目标方案与目标架构进行高保真能力迁移"
-  default_prompt: "使用 $code-migration 识别 Source、Target、用户新方案和约束；顶层 03 只维护 Module 索引和派生进度，复杂模块通过相对链接进入 modules/<module>/00-模块总览.md，并以该模块 01-模块功能点.md 作为 Feature/Atomic Item 状态权威源。模块目录按复杂度自适应创建 02 功能语义、03 Source Behavior WHAT、04 页面结构/交互 HOW-WHERE；只为目标工作区中真实存在的文档生成链接，全局共享事实才写顶层 04/05/06。Checkbox 仅由 Atomic Item、Feature、Module 真实状态派生，不得手工勾选推进状态。Workstream/Batch 只引用 Atomic Item ID 和权威模块文件；按风险控制 Discovery、契约和验证强度，用户已确认的新 UX/布局/交互方案优先于 Source 旧形态。"
+  default_prompt: "使用 $code-migration 识别源项目、目标项目、用户新方案和约束；状态、枚举和值优先使用中文。顶层 03 同时承担模块索引、独立模块派生摘要和小模块内联权威事实：小模块可先在 03 中维护，达到独立维护规模后迁入 modules/M-xxx-模块名称/，保持模块/功能/原子功能项编号不变。独立模块以 01-模块功能点.md 为详细权威事实源；跨多个业务模块复用且可独立验证的公共业务能力写入 modules/shared/01-公共功能点.md，业务模块只引用公共功能编号，不复制状态。模块目录按复杂度自适应创建 02 功能语义、03 源行为、04 页面结构与交互；全局共享契约才写顶层 04/05/06。Checkbox 仅由真实状态派生。工作流和执行批次只引用原子功能项编号及权威位置；按风险控制发现、契约和验证强度，用户已确认的新 UX/布局/交互方案优先于 Source 旧形态。"
