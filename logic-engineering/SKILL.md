@@ -71,7 +71,7 @@ TRANSITIONS    EMITS          HANDLES        GUARANTEES
 CONSTRAINED_BY USES_PRIMITIVE DERIVED_FROM  EVIDENCED_BY
 ```
 
-详细结构见 `references/canonical-logic-model.md` 与 `references/clm-schema-v0.1.md`。
+详细结构见 `references/canonical-logic-model.md`。
 
 ## 4. 语义 ID
 
@@ -89,9 +89,9 @@ scenario.order.cancel.pending_payment
 primitive.transaction.atomic_group
 ```
 
-不要把 Java 类名、Go 文件路径或 Rust module path 当作 canonical ID；实现位置通过 trace mapping 关联。
+不要把 Java 类名、Go 文件路径或 Rust module path 当作规范 ID；实现位置通过 trace mapping 关联。
 
-## 5. 旧代码 → 候选 CLM
+## 5. 现有代码 → 候选 CLM
 
 对模块进行逆向理解时，不以当前文件为边界。
 
@@ -102,43 +102,43 @@ primitive.transaction.atomic_group
       ↓
 骨架发现
       ↓
-按优先级扩展
+按重要性展开
       ↓
 逻辑事实 + 证据
       ↓
 候选逻辑图
       ↓
-候选 CLM + 人类视图
+候选 CLM + 中文投影
 ```
 
-### 5.1 应继续追踪
+### 5.1 应继续追踪的依赖
 
 当下列依赖会实质改变目标功能解释时继续定位：
 
-- 业务 / 领域服务
-- 校验与权限
-- 状态迁移
-- 特殊持久化 / 事务语义
-- 事件 / handler / 队列
-- 重试 / 回退 / 幂等
-- 外部服务适配
-- 运行时或配置驱动分派
+- 业务 / 领域服务；
+- 校验与权限；
+- 状态迁移；
+- 特殊持久化与事务语义；
+- 事件、Handler、Queue；
+- 重试、回退、幂等；
+- 外部服务适配器；
+- 运行时或配置驱动的动态分派。
 
-通常不深入日志、普通 getter/setter、无业务影响的 DTO 映射、普通 wrapper 和框架内部常规实现。
+通常不深入日志、简单 getter/setter、普通 DTO 映射、无业务影响 wrapper、框架内部常规实现。
 
-优先采用 **先宽度发现骨架，再按价值深入关键节点**，避免从首个调用一路深挖到底。
+优先使用 **广度优先骨架发现 + 按重要性最佳优先展开**，避免从首个调用一路深挖到底。
 
 ### 5.2 开放问题驱动
 
 探索必须维护：
 
 ```text
-completed_nodes
-frontier
-open_questions
-hypotheses
-contradictions
-unresolved_dynamic_edges
+已完成节点
+待探索队列
+开放问题
+假设
+矛盾
+未解析动态调用
 ```
 
 继续读取代码前先回答：“当前要关闭哪个开放问题？”
@@ -148,7 +148,7 @@ unresolved_dynamic_edges
 ```text
 已观察（OBSERVED）  源代码直接证明
 推断（INFERRED）    多个已观察事实合成
-假设（ASSUMED）     依赖未验证的框架 / 运行时语义
+假设（ASSUMED）     依赖未验证的框架/运行时语义
 未知（UNKNOWN）     当前证据不足
 ```
 
@@ -156,16 +156,16 @@ unresolved_dynamic_edges
 
 旧代码导入默认先建立 **已观察行为模型**；人或已有明确规范确认后，才建立期望逻辑 / 规范 CLM。
 
-详见 `references/legacy-import.md` 与 `references/legacy-workspace.md`。
+复杂项目按 `references/legacy-workspace.md` 维护持续工作区。
 
 ## 6. 人类可读逻辑
 
-同一个 CLM 至少提供三层中文投影：
+同一个 CLM 至少提供三层自然语言投影：
 
 ```text
-业务视图        业务效果与核心规则
-逻辑视图        条件、步骤、分支、状态变化、失败情况
-技术逻辑视图    事务、并发、幂等、重试、事件顺序、一致性
+业务视图      业务效果与核心规则
+逻辑视图      条件、步骤、分支、状态变化、失败情况
+技术逻辑视图  事务、并发、幂等、重试、事件顺序、一致性
 ```
 
 例如：
@@ -191,9 +191,7 @@ unresolved_dynamic_edges
 - 已取消订单不能再进入发货流程。
 ```
 
-人类视图只能重排和解释 CLM，不能引入 CLM 中不存在的新业务规则。
-
-详见 `references/human-projection.md`。
+人类投影只能重排和解释 CLM，不能引入 CLM 中不存在的新业务规则。详细规则见 `references/human-projection.md`。
 
 ## 7. 结构化编辑与自由文本修改
 
@@ -258,15 +256,42 @@ EXTRACT_COMMON_RULE / REPLACE_REFERENCE
 ADD_CONSTRAINT / UPDATE_CONSTRAINT
 ```
 
-第一版可执行脚本：
+应用补丁后必须重新校验 CLM。详见 `references/semantic-patch.md`。
+
+## 9. 语义影响分析
+
+局部逻辑修改后，不默认全量重新生成；先计算最小充分影响集合：
 
 ```text
-scripts/apply_semantic_patch.py
+Semantic Patch
+    ↓
+Changed Semantic IDs
+    ↓
+反向语义依赖遍历
+    ↓
+直接影响 / 传递影响 / 派生产物 / 复核候选
 ```
 
-详见 `references/semantic-patch.md`。
+优先使用：
 
-## 9. 逻辑优化
+```text
+scripts/analyze_impact.py
+```
+
+影响分析沿 CLM 语义关系和节点内部引用传播，而不是沿源码 import 无限传播。
+
+至少输出：
+
+- 受影响的 Behavior / Rule / State / Scenario / Constraint；
+- 需要重新生成的人类投影；
+- 需要重新生成的测试向量；
+- 需要重新编译的 IIR / generated code；
+- 需要再次运行的验证；
+- 无法确定的复核候选。
+
+详见 `references/impact-analysis.md`。
+
+## 10. 逻辑优化
 
 优化作用于 CLM，不直接改生成代码。
 
@@ -274,32 +299,32 @@ scripts/apply_semantic_patch.py
 
 不改变行为：
 
-- 判断按语义分组
-- 分支 / guard 归一化
-- 决策表重建
-- 状态机重建
-- 命名与概念统一
+- 判断按语义分组；
+- branch / guard 归一化；
+- 决策表重建；
+- 状态机重建；
+- 命名与概念统一。
 
 ### O2 行为保持重构
 
 预期业务行为不变：
 
-- 公共验证提取
-- 公共规则 / 流程提取
-- 重复逻辑消除
-- 条件结构简化
+- 公共验证提取；
+- 公共规则 / Flow 提取；
+- 重复逻辑消除；
+- 条件结构简化。
 
 必须做语义等价验证。
 
-### O3 稳健性优化
+### O3 稳健性改进
 
 通常不改变业务意图，但改变技术可靠性：
 
-- 事务边界
-- 重试
-- 幂等
-- 并发保护
-- 可靠事件发布
+- 事务边界；
+- 重试；
+- 幂等；
+- 并发保护；
+- 可靠事件发布。
 
 必须明确列出实现语义变化。
 
@@ -307,48 +332,48 @@ scripts/apply_semantic_patch.py
 
 真正改变业务规则：
 
-- 新增 / 删除允许状态
-- 修改权限
-- 修改价格、退款等业务规则
-- 补充缺失业务分支
+- 新增/删除允许状态；
+- 修改权限；
+- 修改价格、退款等业务规则；
+- 补充缺失业务分支。
 
 默认需要明确确认。
 
-### 9.1 潜在问题识别
+### 10.1 潜在问题识别
 
 重点检查：
 
 ```text
-缺失分支
-分支重叠
-不可达分支
-规则冲突
-非法状态迁移
-不变量违反
-副作用顺序风险
-事务缺口
-非幂等重试路径
-并发竞争候选
-重复逻辑不一致
+missing case
+branch overlap
+unreachable branch
+contradicting rules
+invalid state transition
+invariant violation
+side-effect ordering risk
+transaction gap
+non-idempotent retry path
+concurrency race candidate
+inconsistent duplicate rules
 ```
 
 没有明确业务证据时必须使用“潜在问题”，不要把个人设计偏好描述成确定 bug。
 
-## 10. 公共逻辑提取
+## 11. 公共逻辑提取
 
 公共逻辑不能只根据文本相似度判断。至少比较：
 
 ```text
 语义是否等价
 领域含义是否相同
-前置 / 后置条件是否相同
+前置/后置条件是否相同
 影响是否相同
-是否具有共同变化耦合
+未来变化是否可能耦合
 ```
 
-确认后创建公共语义节点，让各行为通过引用复用，而不是复制自然语言文本。
+确认后创建公共 Semantic Node，让各 Behavior 通过引用复用，而不是复制自然语言文本。
 
-## 11. 目标实现
+## 12. 目标实现
 
 生成链路：
 
@@ -380,17 +405,11 @@ test framework
 
 不要把源语言技术语法机械翻译。例如 `synchronized` 应先恢复为“同一资源修改必须互斥”的语义要求，再由目标配置选择锁实现。
 
-第一版最小编译器：
-
-```text
-scripts/compile_iir.py
-```
-
 详见 `references/implementation-ir.md`。
 
-## 12. 基础能力库
+## 13. 基础能力库（Primitive Library）
 
-复杂底层能力以基础能力契约（Primitive contract）提供，例如：
+复杂底层能力以 Primitive contract 提供，例如：
 
 ```text
 transaction.atomic_group
@@ -401,62 +420,65 @@ payment.charge
 crypto.verify_signature
 ```
 
-基础能力应描述：
+Primitive 应描述：
 
 ```text
 人类说明
-输入 / 输出契约
-前置 / 后置条件
+输入输出契约
+前置/后置条件
 影响
 失败语义
 幂等 / 原子性属性
-各目标平台实现绑定
+各目标技术栈实现绑定
 验证 / 测试
 ```
 
-CLM 使用基础能力，不复制底层代码细节。
+CLM 使用 Primitive，不复制底层代码细节。
 
-## 13. 验证
+## 14. 验证
 
 建议分层：
 
 ```text
-L0 结构 / 类型有效
-L1 内部语义一致
-L2 实现符合 CLM
+L0 结构 / 类型合法
+L1 模型内部语义一致
+L2 实现符合模型
 L3 场景 / 边界 / 性质测试
-L4 选定属性的形式验证
-L5 人工确认业务意图
+L4 关键性质形式验证
+L5 人确认业务意图
 ```
 
 根据语义选择验证后端，而不是要求单一工具验证所有性质：
 
 ```text
-函数契约            → SMT / Dafny / Why3 类工具
-状态迁移            → 状态模型检查
-并发 / 时序         → TLA+ / LTL 类工具
-示例场景            → 单元 / 集成测试
-不变量              → 性质测试 + 可选形式证明
+函数契约           → SMT / Dafny / Why3 类工具
+状态迁移           → 状态模型检查
+并发 / 时序        → TLA+ / LTL 类工具
+示例               → 单元 / 集成测试
+不变量             → 性质测试 + 可选证明
 ```
 
-生成代码后可重新抽取“可观察语义模型”，与 CLM 的条件、状态写入、外部影响、顺序、错误比较。Round-trip 是额外防线，不替代独立测试。
+生成代码后可重新抽取 Observable Semantic Model，与 CLM 的条件、状态写入、外部影响、顺序、错误比较。Round-trip 是额外防线，不替代独立测试。
 
-第一版语义校验器：
+详见 `references/verification-and-generation.md`。
+
+## 15. 测试从 CLM 独立派生
+
+测试生成优先使用：
 
 ```text
-scripts/validate_clm.py
+scripts/generate_test_vectors.py
 ```
 
-详见 `references/clm-validator.md` 与 `references/verification-and-generation.md`。
-
-## 14. 测试从 CLM 派生
+第一版至少覆盖：
 
 ```text
-场景            → 示例测试
-条件            → 边界测试
-不变量          → 性质测试
-状态机          → 迁移测试
-时序规则        → 集成测试 / 运行时监控
+Rule          → 条件 / 边界测试向量
+Scenario      → Given / When / Then 示例测试
+Transition    → 允许状态迁移测试
+Forbidden     → 禁止状态迁移测试
+Invariant     → 性质测试意图
+Temporal      → 集成 / 运行时验证意图
 ```
 
 例如：
@@ -465,15 +487,19 @@ scripts/validate_clm.py
 Rule: amount <= payment_limit
 ```
 
-至少派生：
+应形成边界测试意图，并由目标测试生成器根据 ValueType 精度产生：
 
 ```text
-amount = limit - 1 → allowed
+amount = limit - δ → allowed
 amount = limit     → allowed
-amount = limit + 1 → rejected
+amount = limit + δ → rejected
 ```
 
-## 15. 上下文压缩
+测试期望必须来自 CLM，而不是生成代码。
+
+详见 `references/test-vector-generation.md`。
+
+## 16. 上下文压缩
 
 大型模块分析使用：
 
@@ -489,14 +515,14 @@ L3 候选 CLM / 中文逻辑
 
 压缩后必须保留 evidence pointer；出现矛盾或需要验证时重新读取源代码。
 
-## 16. 停止条件
+## 17. 停止条件
 
 旧代码探索满足以下条件即可停止主要路径扩展：
 
 ```text
 关键开放问题已经解决
 主执行 / 数据 / 状态路径已经闭合
-重要副作用已经识别
+重要影响已经识别
 重要失败路径已经识别
 不存在可能改变当前解释的关键未解析依赖
 ```
@@ -505,7 +531,7 @@ L3 候选 CLM / 中文逻辑
 
 必要时设置 `max_nodes / max_reads / max_depth` 作为资源保险；达到预算时明确输出“已知 / 未知 / 下一步需要调查”，不得伪装成已经完整理解。
 
-## 17. 最小可执行流水线
+## 18. 最小可执行流水线
 
 当任务涉及“修改逻辑并重新生成实现语义”时，优先使用统一流水线：
 
@@ -522,7 +548,11 @@ scripts/run_logic_pipeline.py
    ↓
 校验更新后的 CLM
    ↓
+分析语义影响范围
+   ↓
 生成中文逻辑投影
+   ↓
+从 CLM 独立生成测试向量
    ↓
 可选编译 IIR
 ```
@@ -536,11 +566,22 @@ python scripts/run_logic_pipeline.py \
   --target-profile evals/fixtures/go-postgres.target-profile.json
 ```
 
+典型输出：
+
+```text
+updated.clm.json
+semantic-diff.json
+impact-analysis.json
+human-logic.md
+test-vectors.json
+implementation.iir.json
+```
+
 任何一步失败都应立即终止，不得继续生成“看起来合理”的后续结果。
 
 详见 `references/end-to-end-pipeline.md`。
 
-## 18. 默认产出
+## 19. 默认产出
 
 根据模式生成当前任务所需的最小充分集合：
 
@@ -552,6 +593,7 @@ python scripts/run_logic_pipeline.py \
 开放问题 / 未知项
 优化提案
 语义补丁
+语义影响分析
 目标配置 / 实现中间表示
 目标实现计划
 验证计划 / 测试向量
@@ -560,7 +602,7 @@ python scripts/run_logic_pipeline.py \
 
 不要为了形式一次性生成所有产物。
 
-## 19. 禁止事项
+## 20. 禁止事项
 
 - 不把当前文件摘要当作模块完整逻辑。
 - 不把函数名直译当作业务解释。
@@ -571,4 +613,5 @@ python scripts/run_logic_pipeline.py \
 - 不把语言或框架特有语法写进规范领域逻辑。
 - 不因为多个代码片段相似就强行抽公共规则。
 - 不在 IIR 存在 `unresolved` 时宣称实现已经完整匹配 CLM。
+- 不把任何局部逻辑修改默认扩散为全仓库重生成；应先做语义影响分析。
 - 不宣称“逻辑正确即可数学保证任意实现正确”；必须说明实际使用的验证层级。
