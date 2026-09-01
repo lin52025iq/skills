@@ -1,0 +1,140 @@
+{
+  "clm": {
+    "schema_version": "0.1",
+    "id": "module.order",
+    "name": "订单模块",
+    "status": "canonical",
+    "domain": [
+      {
+        "id": "domain.order_status",
+        "kind": "enum",
+        "name": "订单状态",
+        "status": "canonical",
+        "origin": "intended",
+        "confidence": "high",
+        "values": ["PENDING_PAYMENT", "PENDING_SHIPMENT", "CANCELLED", "SHIPPED"]
+      }
+    ],
+    "rules": [
+      {
+        "id": "rule.order.cancel.allowed_status",
+        "kind": "rule",
+        "name": "允许取消的订单状态",
+        "status": "canonical",
+        "origin": "intended",
+        "confidence": "high",
+        "condition": {
+          "op": "in",
+          "left": { "ref": "field.order.status" },
+          "right": { "values": ["PENDING_PAYMENT", "PENDING_SHIPMENT"] }
+        }
+      }
+    ],
+    "behaviors": [
+      {
+        "id": "behavior.order.cancel",
+        "kind": "behavior",
+        "name": "取消订单",
+        "status": "canonical",
+        "origin": "intended",
+        "confidence": "high",
+        "inputs": [],
+        "precondition_refs": ["rule.order.cancel.allowed_status"],
+        "flow_refs": ["action.order.cancel.change_status"],
+        "output_refs": [],
+        "failure_refs": [],
+        "postcondition_refs": ["constraint.order.cancelled_not_shippable"]
+      }
+    ],
+    "actions": [
+      {
+        "id": "action.order.cancel.change_status",
+        "kind": "action",
+        "name": "将订单状态改为已取消",
+        "status": "canonical",
+        "origin": "intended",
+        "confidence": "high",
+        "operation": "assign",
+        "target": { "ref": "field.order.status" },
+        "value": { "value": "CANCELLED" },
+        "effect_refs": ["effect.order.status_write"]
+      }
+    ],
+    "decisions": [],
+    "state_machines": [],
+    "effects": [
+      {
+        "id": "effect.order.status_write",
+        "kind": "effect",
+        "name": "修改订单状态",
+        "status": "canonical",
+        "origin": "intended",
+        "confidence": "high",
+        "effect_type": "write",
+        "resource_ref": "field.order.status"
+      }
+    ],
+    "constraints": [
+      {
+        "id": "constraint.order.cancelled_not_shippable",
+        "kind": "constraint",
+        "name": "已取消订单不能继续发货",
+        "status": "canonical",
+        "origin": "intended",
+        "confidence": "high",
+        "constraint_type": "invariant",
+        "condition": {
+          "op": "not",
+          "item": {
+            "op": "all",
+            "items": [
+              {
+                "op": "eq",
+                "left": { "ref": "field.order.status" },
+                "right": { "value": "CANCELLED" }
+              },
+              {
+                "op": "eq",
+                "left": { "ref": "field.order.shipped" },
+                "right": { "value": true }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "scenario.order.cancel.pending_payment",
+        "kind": "scenario",
+        "name": "取消待支付订单",
+        "status": "canonical",
+        "origin": "intended",
+        "confidence": "high",
+        "given": [
+          {
+            "target": { "ref": "field.order.status" },
+            "value": { "value": "PENDING_PAYMENT" }
+          }
+        ],
+        "when_ref": "behavior.order.cancel",
+        "then": [
+          {
+            "target": { "ref": "field.order.status" },
+            "assertion": "eq",
+            "value": { "value": "CANCELLED" }
+          }
+        ]
+      }
+    ],
+    "primitives": [],
+    "relations": [
+      {
+        "source_ref": "behavior.order.cancel",
+        "relation": "REQUIRES",
+        "target_ref": "rule.order.cancel.allowed_status"
+      }
+    ],
+    "evidence": []
+  }
+}
