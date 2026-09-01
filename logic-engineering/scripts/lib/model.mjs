@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
 
 export const COLLECTIONS=['domain','behaviors','rules','decisions','actions','states','effects','constraints','scenarios','primitives','evidence'];
@@ -9,8 +10,8 @@ export const KIND_TO_COLLECTION={
   constraint:'constraints',precondition:'constraints',postcondition:'constraints',invariant:'constraints',uniqueness:'constraints',cardinality:'constraints',ordering:'constraints',temporal:'constraints',concurrency:'constraints',atomicity:'constraints',idempotency:'constraints',forbidden_transition:'constraints',
   scenario:'scenarios',primitive:'primitives',evidence:'evidence'
 };
-export function readJson(path){return JSON.parse(fs.readFileSync(path,'utf8'));}
-export function writeJson(path,value){fs.mkdirSync(new URL('.',`file://${path}`).pathname,{recursive:true});fs.writeFileSync(path,JSON.stringify(value,null,2)+'\n','utf8');}
+export function readJson(file){return JSON.parse(fs.readFileSync(file,'utf8'));}
+export function writeJson(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(value,null,2)+'\n','utf8');}
 export function rootOf(doc){return doc?.clm&&typeof doc.clm==='object'?doc.clm:doc;}
 export function* iterNodes(doc){const root=rootOf(doc);for(const c of COLLECTIONS){for(const n of root?.[c]??[]){if(n&&typeof n==='object')yield [c,n];}}}
 export function buildNodeIndex(doc){const m=new Map();for(const [,n] of iterNodes(doc)){if(typeof n.id==='string')m.set(n.id,n);}return m;}
