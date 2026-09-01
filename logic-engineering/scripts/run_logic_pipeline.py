@@ -13,7 +13,7 @@
 9. 可选编译 IIR v0.2
 10. 校验 IIR v0.2
 11. 编译 Target Test Plan
-12. 可选生成 Go 代码骨架
+12. 可选生成 TypeScript + SQLite 代码骨架
 13. 校验 generated manifest / 漂移
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ def run(cmd:List[str],label:str)->str:
     return p.stdout
 def load_json(path:Path)->Dict[str,Any]: return json.loads(path.read_text(encoding="utf-8"))
 def detect_schema(path:Path)->Path:
-    root=load_json(path).get("clm",load_json(path)); version=str(root.get("version","0.1")); return SCHEMA_DIR/("clm-v0.2.schema.json" if version in {"0.2","2","2.0"} else "clm-v0.1.schema.json")
+    doc=load_json(path); root=doc.get("clm",doc); version=str(root.get("version","0.1")); return SCHEMA_DIR/("clm-v0.2.schema.json" if version in {"0.2","2","2.0"} else "clm-v0.1.schema.json")
 def patch_changed_ids(path:Path)->List[str]:
     p=load_json(path); p=p.get("semantic_patch",p); t=p.get("target_semantic_id") or p.get("target"); return [t] if isinstance(t,str) else []
 def change_set_changed_ids(path:Path)->List[str]:
@@ -46,7 +46,7 @@ def validate_model(path:Path,schema:Path,label:str): run([sys.executable,str(SCR
 def main()->int:
     ap=argparse.ArgumentParser(description="运行逻辑工程统一流水线"); ap.add_argument("clm",type=Path)
     mut=ap.add_mutually_exclusive_group(); mut.add_argument("--patch",type=Path); mut.add_argument("--change-set",type=Path)
-    ap.add_argument("--target-profile",type=Path); ap.add_argument("--generate-go",action="store_true",help="IIR 校验通过后生成 Go v0.1 骨架")
+    ap.add_argument("--target-profile",type=Path); ap.add_argument("--generate-ts",action="store_true",help="IIR 校验通过后生成 TypeScript + SQLite v0.1 骨架")
     ap.add_argument("--output-dir",type=Path,default=Path(".logic-engineering-output")); ap.add_argument("--schema",type=Path); a=ap.parse_args()
     out=a.output_dir; out.mkdir(parents=True,exist_ok=True); working=a.clm; schema=a.schema or detect_schema(working); validate_model(working,schema,"校验原始 CLM")
     impact=None; changed=[]; semantic_diff=None
@@ -67,10 +67,10 @@ def main()->int:
         iir=out/"implementation.iir.json"; run([sys.executable,str(SCRIPT_DIR/"compile_iir.py"),str(working),str(a.target_profile),"-o",str(iir)],"编译 IIR v0.2")
         run([sys.executable,str(SCRIPT_DIR/"validate_iir.py"),str(iir),"--schema",str(SCHEMA_DIR/"iir-v0.2.schema.json")],"校验 IIR v0.2")
         target_tests=out/"target-test-plan.json"; run([sys.executable,str(SCRIPT_DIR/"compile_target_tests.py"),str(vectors),str(iir),"-o",str(target_tests)],"编译目标测试计划")
-        if a.generate_go:
-            generated=out/"generated-go"; run([sys.executable,str(SCRIPT_DIR/"generate_go.py"),str(iir),str(target_tests),"-o",str(generated)],"生成 Go v0.1")
+        if a.generate_ts:
+            generated=out/"generated-ts"; run([sys.executable,str(SCRIPT_DIR/"generate_typescript.py"),str(iir),str(target_tests),"-o",str(generated)],"生成 TypeScript + SQLite v0.1")
             run([sys.executable,str(SCRIPT_DIR/"verify_generated_manifest.py"),str(generated)],"校验生成产物完整性")
-    elif a.generate_go:
-        print(json.dumps({"ok":False,"error":"--generate-go 需要 --target-profile"},ensure_ascii=False)); return 2
-    print(json.dumps({"ok":True,"schema":str(schema),"clm":str(working),"symbol_table":str(symbols),"human_logic":str(human),"semantic_diff":str(semantic_diff) if semantic_diff else None,"impact_analysis":str(impact) if impact else None,"test_vectors":str(vectors),"iir":str(iir) if iir else None,"target_test_plan":str(target_tests) if target_tests else None,"generated_go":str(generated) if generated else None},ensure_ascii=False,indent=2)); return 0
+    elif a.generate_ts:
+        print(json.dumps({"ok":False,"error":"--generate-ts 需要 --target-profile"},ensure_ascii=False)); return 2
+    print(json.dumps({"ok":True,"schema":str(schema),"clm":str(working),"symbol_table":str(symbols),"human_logic":str(human),"semantic_diff":str(semantic_diff) if semantic_diff else None,"impact_analysis":str(impact) if impact else None,"test_vectors":str(vectors),"iir":str(iir) if iir else None,"target_test_plan":str(target_tests) if target_tests else None,"generated_typescript":str(generated) if generated else None},ensure_ascii=False,indent=2)); return 0
 if __name__=="__main__": raise SystemExit(main())
