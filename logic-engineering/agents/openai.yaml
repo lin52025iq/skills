@@ -1,0 +1,4 @@
+interface:
+  display_name: "逻辑工程"
+  short_description: "把代码重建为可读、可修改、可验证并可跨语言生成实现的规范逻辑模型"
+  default_prompt: "使用 $logic-engineering 处理模块级业务逻辑。优先使用中文描述逻辑、规则、状态、影响、证据和修改建议；仅在 schema 字段、Semantic ID、工具名称或必要技术术语中保留英文。现有代码分析先恢复已观察行为，再区分推断、假设和未知，不在忠实解释阶段偷偷优化。所有正式业务修改统一形成 Semantic Patch；生成实现前以 Canonical Logic Model 为事实源，并从 CLM 独立派生测试与验证计划。"
