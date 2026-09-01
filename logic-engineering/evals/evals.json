@@ -1,6 +1,6 @@
 {
   "skill": "logic-engineering",
-  "version": "0.1",
+  "version": "0.2",
   "cases": [
     {
       "id": "import-module-logic",
@@ -28,7 +28,7 @@
       "expected": [
         "不能只根据文本或代码相似度决定抽取",
         "需要比较领域含义、前后条件、副作用和未来变更耦合",
-        "先生成公共逻辑提取提案或 Semantic Patch",
+        "先生成公共逻辑提取提案或 Semantic Change Set",
         "不能直接修改生成代码"
       ]
     },
@@ -44,12 +44,13 @@
     },
     {
       "id": "cross-language-generation",
-      "prompt": "现在已有确认过的取消订单逻辑，请把实现从 Java Spring 改成 Go + PostgreSQL，但业务行为保持不变。",
+      "prompt": "现在已有确认过的取消订单逻辑，请把它实现成 TypeScript + Node.js + SQLite，业务行为保持不变。",
       "expected": [
-        "以 CLM 为事实源，而不是逐行翻译 Java",
-        "先形成目标配置和实现中间表示",
-        "把事务、并发、幂等等语义映射到 Go/PostgreSQL 的实现策略",
-        "从 CLM 独立派生测试，并进行实现一致性验证"
+        "以 CLM 为事实源，而不是逐行翻译旧语言代码",
+        "先形成 ts-sqlite Target Profile 和 IIR v0.2",
+        "SQLite 只属于实现层，不进入 CLM",
+        "从 CLM 独立派生 Test Vector 和 Vitest 目标测试计划",
+        "blocking unresolved 非空时停止生成"
       ]
     },
     {
@@ -64,11 +65,12 @@
     },
     {
       "id": "generated-tests-source",
-      "prompt": "根据刚生成的 Go 代码再帮我生成测试，确保行为一致。",
+      "prompt": "根据刚生成的 TypeScript 代码再反推一套测试，确保行为一致。",
       "expected": [
-        "指出 expected behavior 应来自 CLM 而不是生成代码",
-        "测试生成应与代码生成独立",
-        "覆盖场景、边界、状态迁移以及适用时的不变量"
+        "拒绝从 generated code 反推 expected behavior",
+        "测试期望应来自 CLM Test Vector",
+        "测试装配由 IIR + Target Profile 决定",
+        "首个目标测试使用 Vitest"
       ]
     },
     {
@@ -78,6 +80,16 @@
         "不能仅根据接口或命名猜测最终实现",
         "继续检查工厂、依赖注入、配置或注册机制",
         "无法确认时标记为高概率或未解析动态关系"
+      ]
+    },
+    {
+      "id": "node-toolchain",
+      "prompt": "运行 logic-engineering 的校验和完整流水线。",
+      "expected": [
+        "使用 Node.js 20+ 工具链",
+        "主路径不依赖 Python",
+        "使用 logic_cli.mjs / run_pipeline.mjs / run_v02_regression.mjs",
+        "不恢复已经删除的 Python 双实现"
       ]
     }
   ]
