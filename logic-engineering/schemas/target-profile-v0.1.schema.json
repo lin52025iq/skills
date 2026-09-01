@@ -42,6 +42,16 @@
         "test_framework": {"type": "string", "minLength": 1},
         "binding_key": {"type": "string"}
       },
+      "allOf": [
+        {
+          "if": {"required": ["transaction_strategy"]},
+          "then": {"required": ["transaction_scope"]}
+        },
+        {
+          "if": {"properties": {"persistence_generation": {"const": "explicit_mapping"}}, "required": ["persistence_generation"]},
+          "then": {"required": ["persistence_mappings"]}
+        }
+      ],
       "additionalProperties": false
     }
   }
