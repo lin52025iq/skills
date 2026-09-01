@@ -26,16 +26,7 @@ Semantic Change Set 适合：
 
 ## 2. 原子性
 
-所有 operation 必须先在内存副本中执行。
-
-```text
-operation 1 ✓
-operation 2 ✓
-operation 3 ✗
-
-→ 整个 Change Set 失败
-→ 不写出部分更新后的 CLM
-```
+所有 operation 必须先在内存副本中执行。任一步失败，不写出部分模型。
 
 ## 3. 基本结构
 
@@ -66,49 +57,41 @@ REMOVE_RELATION
 REPLACE_REFERENCE
 ```
 
-高级操作如 `EXTRACT_COMMON_RULE / INLINE_RULE / RENAME_SYMBOL / MOVE_NODE` 应先规划为基础操作，再作为一个 Change Set 原子执行。
+高级操作应先规划为基础操作，再作为一个 Change Set 原子执行。
 
-## 5. 应用顺序
+## 5. 并发修改保护
 
-操作按 `operations` 顺序执行。依赖新节点的引用更新必须晚于 `ADD_NODE`。
-
-## 6. 并发修改保护
-
-Change Set 支持两层前置条件：
+两层前置条件：
 
 ```text
 base_model_version
 base_semantic_hash
 ```
 
-`base_model_version` 防止跨模型版本误应用。
-
-`base_semantic_hash` 防止同一个 v0.2 模型已经被其他修改改变后，旧 Change Set 仍继续应用。
-
-哈希通过：
+计算哈希：
 
 ```bash
-python scripts/semantic_hash.py model.json
+node scripts/logic_cli.mjs hash model.json
 ```
 
-计算。
+应用：
 
-当前 semantic hash 默认排除证据、置信度和 notes 等不会改变执行语义的元数据。
+```bash
+node scripts/apply_change_set.mjs model.json change.json \
+  -o updated.json \
+  --diff-output semantic-diff.json
+```
 
-任一前置条件不匹配，必须拒绝整个 Change Set。
+任一前置条件不匹配，拒绝整个 Change Set。
 
-应用成功后的 diff 同时记录：
+成功 diff 记录：
 
 ```text
 base_semantic_hash
 result_semantic_hash
 ```
 
-从而形成明确的语义版本链。
-
-## 7. 变更等级
-
-整个 Change Set 声明内部最高变化等级：
+## 6. 变更等级
 
 ```text
 O1_NORMALIZATION
@@ -119,38 +102,23 @@ O4_BUSINESS_CHANGE
 
 内部任何 operation 改变业务行为时，Change Set 至少是 O4。
 
-## 8. 验证要求
+## 7. 验证与影响分析
 
-必须显式保存本次变化需要的验证，例如：
+应用后重新执行 CLM Validator、Impact Analysis 和测试派生。
 
-```json
-[
-  "schema",
-  "type_check",
-  "semantic_consistency",
-  "scenario_tests",
-  "human_confirmation"
-]
+```bash
+node scripts/analyze_impact.mjs updated.json <changed-id...> --output impact.json
 ```
-
-Change Set 应用完成后必须重新执行 Validator、影响分析及相应测试生成。
-
-## 9. 影响分析
-
-汇总全部 `changed_semantic_ids` 后统一传播，不允许只分析第一项修改。
 
 统一流水线：
 
 ```bash
-python scripts/run_logic_pipeline.py model.json \
-  --change-set change.json
+node scripts/run_pipeline.mjs model.json --change-set change.json
 ```
 
-会自动完成应用、重新校验、影响分析、中文投影和测试向量生成。
+## 8. 人类展示
 
-## 10. 人类展示
-
-默认展示业务变化，不展示低层 JSON operation：
+默认展示业务变化，不先展示低层 JSON operation。
 
 ```text
 修改：允许已支付订单取消
@@ -160,29 +128,14 @@ python scripts/run_logic_pipeline.py model.json \
 
 新增场景：
 + 取消已支付订单
-
-影响：
-- 取消订单行为
-- 相关测试
-- 目标实现
 ```
 
-需要审计时才展开 operation、semantic hash 和完整 diff。
+需要审计时再展开 operation、semantic hash 和完整 diff。
 
-## 11. 与 CLM v0.2 冻结的关系
-
-Change Set 属于 CLM v0.2 的核心写入协议。
-
-冻结 Gate 见：
-
-`references/clm-v0.2-freeze-checklist.md`
-
-只要后续存在破坏 Change Set 原子性、哈希保护或 Semantic ID 稳定性的改动，就必须视为 CLM 协议破坏性变化。
-
-## 12. 禁止事项
+## 9. 禁止事项
 
 - 不把互相依赖的多个 Patch 当作独立业务提交。
 - 不在部分操作失败后保留部分 CLM 修改。
-- 不绕过 semantic hash 冲突继续强制应用旧 Change Set。
+- 不绕过 semantic hash 冲突强制应用旧 Change Set。
 - 不在 Change Set 中写目标语言代码。
-- 不跳过应用后的 CLM 校验和影响分析。
+- 不跳过应用后的校验和影响分析。
