@@ -1,39 +1,18 @@
 # Target Profile v0.1
 
-Target Profile 描述 **同一份 CLM 准备在哪个技术环境中实现**。
-
-它不是业务逻辑，也不是代码模板。
+Target Profile 描述 **同一份 CLM 准备在哪个技术环境中实现**。它不是业务逻辑，也不是代码模板。
 
 ```text
-CLM
- +
-Target Profile
- ↓
-IIR
- ↓
-Target Adapter
+CLM + Target Profile
+→ IIR
+→ Target Adapter
 ```
 
 ## 1. 边界
 
-CLM 保存：
+CLM 保存业务规则、状态、行为顺序，以及原子性、幂等、并发等要求。
 
-- 业务规则；
-- 状态；
-- 行为顺序；
-- 原子性、幂等、并发等要求。
-
-Target Profile 保存：
-
-- 目标语言；
-- 运行时；
-- 框架/架构；
-- 数据库；
-- 消息系统；
-- 事务/并发/重试实现策略；
-- 目标可精确支持的事务作用域；
-- 明确的持久化 mapping；
-- 测试框架。
+Target Profile 保存：目标语言、运行时、框架/架构、数据库、消息系统、事务/并发/重试实现策略、可精确支持的事务作用域、显式 persistence mapping 和测试框架。
 
 Target Profile 变化通常不修改 CLM。
 
@@ -41,15 +20,16 @@ Target Profile 变化通常不修改 CLM。
 
 结构以 `schemas/target-profile-v0.1.schema.json` 为准。
 
-统一流水线在 IIR 编译前先校验：
-
 ```bash
-node scripts/schema_validate.mjs \
-  target-profile.json \
-  schemas/target-profile-v0.1.schema.json
+node scripts/schema_validate.mjs target-profile.json schemas/target-profile-v0.1.schema.json
 ```
 
-Schema valid 只表示配置形状合法，不表示当前 CLM 一定能在该 Profile 下完整实现。实现可行性由 IIR Compiler / Validator 继续判断。
+Schema valid 只表示配置形状合法，不表示当前 CLM 一定能完整实现。实现可行性由 IIR Compiler / Validator 继续判断。
+
+条件要求：
+
+- 声明 `transaction_strategy` 时必须同时声明 `transaction_scope`；
+- `persistence_generation=explicit_mapping` 时必须提供 `persistence_mappings`。
 
 ## 3. 当前 Reference Target
 
@@ -78,15 +58,9 @@ contract_only
 explicit_mapping
 ```
 
-### contract_only
+`contract_only` 只生成 Repository Contract。
 
-只生成 Repository Contract，不生成真实 SQL。
-
-适用于数据结构尚未确定、目标项目已有 ORM/Repository、或需要人工绑定已有数据库层。
-
-### explicit_mapping
-
-只有提供明确 mapping 后，Target Adapter 才可以生成 SQL/持久化 Adapter。
+`explicit_mapping` 只有在 Entity 明确声明 table、primary key 和全部必要 columns 后才允许生成 SQL：
 
 ```json
 {
@@ -97,37 +71,18 @@ explicit_mapping
       "primary_key": "domain.order.id",
       "columns": {
         "domain.order.id": "id",
-        "domain.order.status": "status",
-        "domain.order.owner_id": "owner_id"
+        "domain.order.status": "status"
       }
     }
   }
 }
 ```
 
-## 5. Explicit Mapping Gate
+缺失或错误 mapping 进入 blocking unresolved。
 
-当前 save/upsert 生成要求：
+## 5. SQLite Adapter
 
-1. Repository 对应 Entity 必须有 mapping；
-2. `table` 是安全 SQL identifier；
-3. `primary_key` 必须引用该 Entity 的字段；
-4. `primary_key` 必须存在于 `columns`；
-5. save 所需 Entity 字段都有 column mapping；
-6. column 名必须是安全 SQL identifier；
-7. 不允许 mapping 引用其他 Entity 的字段。
-
-缺失时进入 blocking unresolved。
-
-```text
-Target Profile Schema valid
-≠
-Target Profile 对当前 CLM 可完整生成
-```
-
-## 6. SQLite Adapter
-
-当前 TypeScript Adapter 不绑定某个 SQLite npm 驱动，而生成驱动无关契约：
+当前 TypeScript Adapter 生成驱动无关契约：
 
 ```ts
 export interface SqliteExecutor {
@@ -135,13 +90,13 @@ export interface SqliteExecutor {
 }
 ```
 
-并根据 explicit mapping 生成稳定的 `INSERT ... ON CONFLICT ... DO UPDATE` Repository 实现。
+以及由 explicit mapping 确定性生成的 `INSERT ... ON CONFLICT ... DO UPDATE` Repository。
 
-实际项目可以把 `node:sqlite`、`better-sqlite3`、`sqlite3` 或已有数据库封装绑定到这个接口。驱动选择属于项目集成层，不反向影响 CLM。
+具体使用 `node:sqlite`、`better-sqlite3` 或其他驱动属于项目集成层。
 
-## 7. Transaction Capability
+## 6. Transaction Capability
 
-Target Profile 使用两个字段描述事务能力：
+Target Profile 使用：
 
 ```text
 transaction_strategy
@@ -150,48 +105,55 @@ transaction_scope
 
 当前 Reference Target：
 
-```json
-{
-  "transaction_strategy": "sqlite_transaction",
-  "transaction_scope": "full_behavior"
-}
-```
-
-`transaction_scope` 当前允许：
-
 ```text
-full_behavior       可以精确把整个 Behavior 实现放入一个事务
-contiguous_steps    可以精确包裹 Behavior flow 中连续的一段步骤
+sqlite_transaction
+full_behavior
 ```
 
-当前 TypeScript + SQLite transaction layer 只实现 `full_behavior`。
+`full_behavior` 表示目标实现只能在 **Atomicity members 完整覆盖 Behavior flow** 时准确生成事务。
 
-因此 Atomicity Constraint 必须满足：
+如果 CLM 只要求 flow 中部分步骤原子，当前 Target 不能通过扩大事务范围冒充等价实现，IIR Gate 必须拒绝。
 
-```text
-atomicity.behavior_ref = 目标 Behavior
-atomicity.members      = 该 Behavior 完整 flow，且顺序一致
-```
+详细规则见 `references/transaction-generation.md`。
 
-如果 CLM 只要求部分步骤原子，而当前 Target Profile 只有 `full_behavior`，不得扩大事务范围后假装等价，IIR Gate 必须拒绝。
+## 7. Transaction-scoped SQLite Session
 
-### 共享 SQLite 会话契约
-
-事务 wrapper 与其内部调用的生成 Repository Adapter 必须绑定到同一个 SQLite transaction/session context。
-
-Target Adapter 当前生成：
+事务能力必须把实际事务内 executor 暴露给 composition：
 
 ```ts
 export interface SqliteTransactionRunner {
-  transaction<T>(work: () => Promise<T>): Promise<T>;
+  transaction<T>(
+    work: (executor: SqliteExecutor) => Promise<T>
+  ): Promise<T>;
 }
 ```
 
-项目集成层负责保证 `work` 内的 Repository `run(...)` 使用同一事务上下文。不能用彼此独立的数据库连接实例冒充同一事务。
+正确路径：
 
-## 8. Concurrency / Retry / Idempotency
+```text
+BEGIN
+→ transaction executor
+→ 用 executor 构造 Repository
+→ 构造 Use Case
+→ execute
+→ COMMIT / ROLLBACK
+```
 
-Target Profile 可以提供：
+禁止提前用事务外 executor 构造 Repository，再仅在外层包一个 `transaction(...)`。
+
+## 8. Automatic Composition
+
+当事务 Use Case 的全部依赖都是已生成 SQLite Repository 时，Target Adapter 可以自动生成 composition factory。
+
+如果仍存在 External Port 或没有明确 adapter 的依赖：
+
+- 不猜第三方实现；
+- manifest 标记 `manual_composition`；
+- Transactional Wrapper 可以生成，但不能宣称 fully composed。
+
+## 9. Concurrency / Retry / Idempotency
+
+Profile 可以提供：
 
 ```text
 concurrency_strategy
@@ -199,21 +161,18 @@ retry_strategy
 idempotency_strategy
 ```
 
-只有 CLM 存在对应 Constraint 时才消费这些策略。
+只有 CLM 已存在对应 Constraint 时才消费这些策略。禁止仅因为 Profile 有配置就给业务流程新增行为。
 
-禁止仅因为 Profile 提供 retry/lock 就自动给业务流程增加行为。
+## 10. 版本策略
 
-## 9. Profile 版本策略
+Target Profile 与 CLM/IIR 分开版本化。破坏字段语义时升级 Target Profile Schema；增加目标技术通常不需要修改 CLM。
 
-Target Profile 与 CLM/IIR 分开版本化。
-
-破坏字段语义时升级 Target Profile Schema 版本；新增可选目标技术通常不需要升级 CLM。
-
-## 10. 禁止事项
+## 11. 禁止事项
 
 - 不在 Target Profile 中重定义业务规则。
 - 不把 SQLite table/column 名写入 CLM。
-- 不从 Entity 字段名自动猜 table/column。
+- 不从 Entity 字段名猜 table/column。
 - 不因 Schema valid 就跳过 IIR unresolved Gate。
-- 不让 Target Adapter 自行补 missing mapping。
-- 不把目标不支持的部分事务范围扩大成 whole behavior 后宣称语义等价。
+- 不让 Target Adapter 补 missing mapping。
+- 不扩大 Atomicity 范围后宣称等价。
+- 不让事务外 Repository 冒充 transaction-scoped Repository。
