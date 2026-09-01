@@ -6,7 +6,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "validate": "node scripts/validate_clm.mjs",
+    "validate": "node scripts/logic_cli.mjs validate-clm",
+    "pipeline": "node scripts/run_pipeline.mjs",
     "regression": "node scripts/run_v02_regression.mjs"
   }
 }
