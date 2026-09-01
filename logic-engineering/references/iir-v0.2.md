@@ -196,7 +196,7 @@ IIR 不保留裸 `then/else` ID 列表，而是递归展开：
 
 当前 v0.2 暂不支持内层 foreach 的 collection 来自外层 `item.xxx`。这种情况进入 blocking unresolved。
 
-## 8. Repository Contract
+## 8. Repository Contract 与 Persistence Mapping
 
 需要持久化时先形成 Repository Contract，不直接把 SQL 写入 CLM。
 
@@ -209,11 +209,34 @@ IIR 不保留裸 `then/else` ID 列表，而是递归展开：
   "operations": [
     { "name": "save", "semantic_refs": ["effect.order.status_write"] }
   ],
-  "binding": { "strategy": "repository", "provider": "SQLite" }
+  "binding": {
+    "strategy": "repository",
+    "provider": "SQLite",
+    "mapping": {
+      "table": "orders",
+      "primary_key": "domain.order.id",
+      "columns": {
+        "domain.order.id": "id",
+        "domain.order.status": "status"
+      }
+    }
+  }
 }
 ```
 
-首个 Reference Target 使用 SQLite，但表名、列名、索引和 SQL 必须来自明确 persistence mapping；缺少 mapping 时只生成 adapter boundary/TODO。
+显式 mapping 来自 Target Profile，不由 IIR 或 Generator 猜测。
+
+`persistence_generation=explicit_mapping` 时，IIR Compiler 必须检查：
+
+- Entity mapping 存在；
+- table / column 是安全 identifier；
+- primary key 属于当前 Entity；
+- primary key 已映射；
+- save 所需 Entity 字段均有 column mapping。
+
+不满足时进入 blocking unresolved。
+
+详见 `references/target-profile-v0.1.md`。
 
 ## 9. External Port
 
@@ -285,7 +308,7 @@ blocking unresolved 非空时禁止 Target Adapter 生成“完整实现”。
 ```bash
 node scripts/compile_iir.mjs model.json target-profile.json -o implementation.iir.json
 node scripts/schema_validate.mjs implementation.iir.json schemas/iir-v0.2.schema.json
-node scripts/logic_cli.mjs validate-iir implementation.iir.json
+node scripts/validate_iir.mjs implementation.iir.json
 ```
 
 至少确认：
@@ -295,6 +318,7 @@ IIR Schema valid
 Use Case dependency valid
 Domain Types / Runtime Bindings 完整
 Decision/Foreach 结构完整
+显式 Persistence Mapping 完整
 必要技术策略已确定
 Traceability 覆盖
 blocking unresolved = 0
