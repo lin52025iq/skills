@@ -25,6 +25,6 @@ if(profile){
   run('schema_validate.mjs',[iir,path.join(SCHEMAS,'iir-v0.2.schema.json')],'校验 IIR Schema');
   run('logic_cli.mjs',['validate-iir',iir],'校验 IIR Semantic');
   run('compile_target_tests.mjs',[path.join(out,'test-vectors.json'),iir,'-o',targetTests],'编译目标测试计划');
-  if(has('--generate-ts',args)){generated=path.join(out,'generated-ts');run('generate_typescript.mjs',[iir,targetTests,'-o',generated],'生成 TypeScript + SQLite');run('logic_cli.mjs',['verify-manifest',generated],'校验生成产物完整性');if(has('--verify-ts',args))run('verify_typescript.mjs',[generated],'执行 TypeScript/Vitest Gate')}
+  if(has('--generate-ts',args)){generated=path.join(out,'generated-ts');run('generate_typescript_v02.mjs',[iir,targetTests,'-o',generated],'生成 TypeScript + SQLite v0.2');run('logic_cli.mjs',['verify-manifest',generated],'校验生成产物完整性');if(has('--verify-ts',args))run('verify_typescript.mjs',[generated],'执行 TypeScript/Vitest Gate')}
 }else if(has('--generate-ts',args)||has('--verify-ts',args)){console.error('--generate-ts/--verify-ts 需要 --target-profile');process.exit(2)}
 console.log(JSON.stringify({ok:true,clm:working,output_dir:out,generated_typescript:generated},null,2));
