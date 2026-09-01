@@ -83,15 +83,8 @@ function testVectors(document){
   return{source_clm:root.id,test_vector_version:'0.2',vectors,warnings:vectors.length?[]:['当前模型没有生成测试向量']}
 }
 
-function validateIir(document){
-  const root=document.iir??document,errors=[],warnings=[];if(String(root.version)!=='0.2')errors.push({code:'IIR_VERSION',message:'IIR version 必须为 0.2'});
-  const deps=new Set([...(root.repository_contracts??[]),...(root.external_ports??[])].map(x=>x.id));for(const uc of root.use_cases??[])for(const dep of uc.dependencies??[])if(!deps.has(dep))errors.push({code:'IIR_BROKEN_DEPENDENCY',message:`${uc.id} 依赖不存在: ${dep}`});
-  const trace=new Set((root.traceability??[]).map(x=>x.implementation_id));for(const uc of root.use_cases??[])if(!trace.has(uc.id))errors.push({code:'IIR_MISSING_TRACEABILITY',message:`${uc.id} 缺少 traceability`});
-  for(const item of root.unresolved??[]){const blocking=typeof item==='string'||item?.severity==='blocking'||item?.blocking===true;if(blocking)errors.push({code:'IIR_BLOCKING_UNRESOLVED',message:typeof item==='string'?item:item.semantic_ref??item.reason});else warnings.push({code:'IIR_UNRESOLVED_WARNING',message:item?.semantic_ref??item?.reason})}
-  return{valid:!errors.length,errors,warnings}
-}
 function verifyManifest(directory){const manifest=readJson(path.join(directory,'manifest.json')),errors=[];for(const artifact of manifest.artifacts??[]){const file=path.join(directory,artifact.path);if(!fs.existsSync(file)){errors.push({code:'GENERATED_FILE_MISSING',path:artifact.path});continue}const contentHash=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');if(contentHash!==artifact.content_hash)errors.push({code:'GENERATED_FILE_DRIFT',path:artifact.path})}return{valid:!errors.length,errors}}
-function usage(){console.log(`logic_cli.mjs <command>\n\ncommands:\n  validate-clm\n  symbols\n  hash\n  render\n  test-vectors\n  validate-iir\n  verify-manifest`)}
+function usage(){console.log(`logic_cli.mjs <command>\n\ncommands:\n  validate-clm\n  symbols\n  hash\n  render\n  test-vectors\n  verify-manifest`)}
 
 const [command,...args]=process.argv.slice(2);
 try{
@@ -100,7 +93,6 @@ try{
   else if(command==='hash')console.log(semanticHash(readJson(args[0])));
   else if(command==='render'){const text=renderHuman(readJson(args[0])),output=option(args,'-o','--output');if(output){fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,text,'utf8')}else console.log(text)}
   else if(command==='test-vectors'){const result=testVectors(readJson(args[0])),output=option(args,'-o','--output');if(output)writeJson(output,result);else console.log(JSON.stringify(result,null,2))}
-  else if(command==='validate-iir'){const result=validateIir(readJson(args[0]));console.log(JSON.stringify(result,null,2));process.exit(result.valid?0:1)}
   else if(command==='verify-manifest'){const result=verifyManifest(args[0]);console.log(JSON.stringify(result,null,2));process.exit(result.valid?0:1)}
   else{usage();process.exit(command?1:0)}
 }catch(error){fail(error.message,{stack:error.stack})}
