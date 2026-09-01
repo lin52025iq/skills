@@ -1,4 +1,4 @@
 interface:
   display_name: "代码迁移"
   short_description: "基于真实源证据、目标方案与目标架构进行高保真能力迁移"
-  default_prompt: "使用 $code-migration 识别 Source、Target、用户新方案和约束；以 02 的原子功能项作为唯一细粒度完成事实源，功能项组仅按需用于可读性，Workstream 作为所有权/并行边界，DEV/VER Batch 仅在多个强关联原子项需要一起处理时临时使用且必须逐项回写。按风险控制 Discovery、SB、INT/REG、07/08、Gate 和验证粒度：低风险保持精简，中高风险检查来源真实性、关键反向调用、行为、交互和页面结构；07 只维护 WHAT，08 维护 HOW/WHERE；用户已确认的新 UX/布局/交互方案优先于 Source 旧形态，Target 已有组件不能自动推导产品需求。Feature 与 Module 状态只能由原子项和必要验证向上派生。"
+  default_prompt: "使用 $code-migration 识别 Source、Target、用户新方案和约束；目标工作区标准产物按 00 状态总览、01 任务上下文、02 迁移约束、03 功能/原子项台账、04 功能语义、05 源行为 WHAT、06 页面结构/交互 HOW-WHERE、07 多源融合、08 重大决策、09 执行计划的稳定顺序组织，未使用的可选文档可省略但不得另建无序号同类顶层文档。以 03 的 Atomic Item 作为唯一细粒度完成事实源，Group 仅按需用于可读性，Workstream 作为所有权/并行边界，DEV/VER Batch 只在多个强关联 Atomic Item 需要一起处理时临时使用且必须逐项回写。按风险控制 Discovery、SB、INT/REG、05/06、Gate 和验证粒度；用户已确认的新 UX/布局/交互方案优先于 Source 旧形态，Target 已有组件不能自动推导产品需求，Feature 与 Module 状态只能由 Atomic Item 和必要验证向上派生。"
