@@ -12,7 +12,7 @@ function check(label,ok){return{label,ok,returncode:ok?0:1,stdout:'',stderr:''}}
 const model=path.join(FIX,'order-cancel.atomicity.v0.2.json'),partial=path.join(FIX,'order-cancel.atomicity.partial.v0.2.json'),profile=path.join(FIX,'ts-sqlite.target-profile.json'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'logic-tx-reg-')),checks=[];
 const out=path.join(tmp,'positive');fs.mkdirSync(out,{recursive:true});
 checks.push(run('schema_validate.mjs',[model,path.join(SCHEMAS,'clm-v0.2.schema.json')],'Atomicity CLM Schema'));
-checks.push(run('logic_cli.mjs',['validate-clm',model],'Atomicity CLM Semantic'));
+checks.push(run('validate_clm.mjs',[model],'Atomicity CLM Semantic'));
 checks.push(run('logic_cli.mjs',['test-vectors',model,'-o',path.join(out,'tests.json')],'Atomicity Test Vector'));
 checks.push(run('compile_iir.mjs',[model,profile,'-o',path.join(out,'iir.json')],'Atomicity IIR'));
 checks.push(run('schema_validate.mjs',[path.join(out,'iir.json'),path.join(SCHEMAS,'iir-v0.2.schema.json')],'Atomicity IIR Schema'));
@@ -44,6 +44,7 @@ checks.push(check('事务层纳入 tsconfig',tsconfigOk));
 
 const neg=path.join(tmp,'negative');fs.mkdirSync(neg,{recursive:true});
 checks.push(run('schema_validate.mjs',[partial,path.join(SCHEMAS,'clm-v0.2.schema.json')],'Partial Atomicity CLM Schema'));
+checks.push(run('validate_clm.mjs',[partial],'Partial Atomicity CLM Semantic'));
 checks.push(run('compile_iir.mjs',[partial,profile,'-o',path.join(neg,'iir.json')],'Partial Atomicity IIR'));
 checks.push(run('validate_iir.mjs',[path.join(neg,'iir.json')],'Partial Atomicity 必须被 IIR Gate 拒绝',1));
 let partialDetected=false;try{const p=spawnSync(process.execPath,[path.join(DIR,'validate_iir.mjs'),path.join(neg,'iir.json')],{encoding:'utf8'});const data=JSON.parse(p.stdout);partialDetected=data.errors?.some(x=>x.code==='IIR_TRANSACTION_SCOPE_UNSUPPORTED')}catch{}
