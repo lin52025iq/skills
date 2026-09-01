@@ -129,6 +129,30 @@
       "expected_output": "Discovery 可以判定为足够进入实施，不继续为了证明数学意义上的 100% 完整而无限扫描；仍允许开发中发现新事实后局部重新校准。",
       "files": [],
       "assertions": ["Discovery 有明确停止条件。", "不会无限分析。"]
+    },
+    {
+      "id": 17,
+      "name": "inline-module-upgrades-with-stable-ids",
+      "prompt": "通知设置最初只有一个低风险功能，直接写在顶层 03。后来增加邮件、短信、Webhook、失败重试和独立验证，希望拆成独立模块。",
+      "expected_output": "把该模块从顶层内联升级到 modules/M-xxx-通知设置/，原模块编号、功能编号和原子功能项编号全部保持不变；先迁移详细事实，再把顶层 03 收敛为派生摘要和链接，不能保留两份可写状态。",
+      "files": [],
+      "assertions": ["模块升级只改变承载位置。", "编号与历史语义保持稳定。", "拆分后没有双写详细事实。"]
+    },
+    {
+      "id": 18,
+      "name": "shared-business-capability-not-code-utility",
+      "prompt": "订单、用户和报表都依赖同一套权限校验和操作结果通知；Target 也有 Button、formatDate、useDebounce 等共享代码。",
+      "expected_output": "把可独立验证的权限校验、跨模块通知等业务能力放入 modules/shared/01-公共功能点.md，由业务模块引用公共功能编号；Button、formatDate、Hook 等纯工程基础设施不能因为共享代码就登记成公共功能。",
+      "files": [],
+      "assertions": ["公共模块承载公共业务能力而非普通共享代码。", "公共功能状态只维护一处。", "业务模块通过编号引用公共能力。"]
+    },
+    {
+      "id": 19,
+      "name": "chinese-canonical-enums",
+      "prompt": "迁移工作区里有人写了 almost-done、pending-check、差不多完成、ready-ish 等自定义状态，并准备新增 state.json 作为机器状态源。",
+      "expected_output": "统一回中文规范枚举，例如未开始、开发中、待验证、验证中、验证失败、已完成等；schema 只约束 Markdown 权威事实的字段和值，不新增 JSON/YAML 第二事实源。",
+      "files": [],
+      "assertions": ["状态和枚举优先使用中文规范值。", "不允许随意创造近义状态。", "canonical schema 不制造第二事实源。"]
     }
   ]
 }
