@@ -24,18 +24,16 @@ description: 将现有项目中的模块级业务实现重建为与编程语言�
 
 1. **逻辑是业务事实源。** canonical CLM 优先于自然语言散文和生成代码。
 2. **自然语言是 CLM 的人类投影。** 自由文本只能提出修改建议，不能静默改 canonical 状态。
-3. **生成代码是输出。** 完成逻辑优先接管后，业务修改回到 CLM；不要把手改 generated code 当正式业务变更。
+3. **生成代码是输出。** 业务修改回到 CLM；不要把手改 generated code 当正式业务变更。
 4. **每条语义有稳定 ID。** Semantic ID 与文件路径、类名、函数名和目标语言解耦。
 5. **忠实解释与优化分离。** 先说明代码实际做什么，再单独提出应该怎样优化。
 6. **证据优先。** 旧代码导入必须区分：已观察、推断、假设、未知。
-7. **大模型负责提出，确定性工具负责裁决。** Schema、类型、引用、测试、验证器比“模型觉得正确”优先。
-8. **业务语义与技术实现分离。** 事务、幂等、顺序、互斥等要求进入 CLM；具体框架绑定进入 IIR / Target Profile。
+7. **大模型负责提出，确定性工具负责裁决。** 类型、引用、测试和验证器优先于“模型觉得正确”。
+8. **业务语义与技术实现分离。** CLM 描述业务与一致性要求；IIR / Target Profile 决定技术实现。
 9. **测试从 CLM 独立派生。** 不从生成代码反推预期结果。
 10. **存在 blocking unresolved 时不得宣称实现完整匹配。**
 
-## 2. 四类工作模式
-
-内部统一为四类模式；用户不需要知道模式名。
+## 2. 工作模式
 
 ```text
 理解（UNDERSTAND）
@@ -48,14 +46,31 @@ description: 将现有项目中的模块级业务实现重建为与编程语言�
   CLM → Target Profile → IIR → 目标实现
 
 验证（VERIFY）
-  Schema、类型、语义一致性、测试、实现符合性、形式验证
+  类型、语义一致性、测试、实现符合性、形式验证
 ```
 
-## 3. CLM 版本策略
+## 3. 运行时与工具链
 
-新建模型、准备进入 canonical 的模型优先使用 **CLM v0.2**。
+本 Skill 的确定性工具链统一使用 **Node.js 20+**。
 
-v0.2 的核心变化：
+```text
+scripts/logic_cli.mjs       日常 CLI
+scripts/run_pipeline.mjs    统一流水线
+scripts/run_v02_regression.mjs  核心回归 Gate
+scripts/apply_patch.mjs
+scripts/apply_change_set.mjs
+scripts/analyze_impact.mjs
+scripts/migrate_clm_v01_to_v02.mjs
+scripts/lib/model.mjs       公共语义模型与类型工具
+```
+
+不长期维护 Python / Node 双实现。旧实现完成迁移后应删除。
+
+详细命令见 `references/node-toolchain.md`。
+
+## 4. CLM 版本策略
+
+新建模型、准备进入 canonical 的模型使用 **CLM v0.2**。
 
 ```text
 统一 Node Registry
@@ -66,204 +81,147 @@ v0.2 的核心变化：
 + Semantic Change Set
 ```
 
-旧 v0.1 模型可兼容读取；需要正式修改或生成时优先迁移：
+旧 v0.1 模型仅用于兼容；正式修改前迁移：
 
 ```bash
-python scripts/migrate_clm_v01_to_v02.py old.json -o new.json
+node scripts/migrate_clm_v01_to_v02.mjs old.json -o new.json
 ```
 
-详细规范见：
+主要规范：
 
 - `references/clm-v0.2.md`
 - `schemas/clm-v0.2.schema.json`
-- `scripts/clm_model.py`
-- `scripts/expression_ast.py`
-- `scripts/symbol_table.py`
+- `scripts/lib/model.mjs`
 
-## 4. 旧代码理解流程
+## 5. 旧代码理解
 
-分析现有项目时，不以当前文件为边界，也不追踪所有函数。
+不要以当前文件为边界，也不要无差别追踪全部函数。
 
 ```text
-确定目标模块 / 功能
+确定模块 / 功能
 → 找入口
 → 扫描一到两层骨架
-→ 识别关键业务节点
-→ 维护开放问题
+→ 找关键业务节点
+→ 建立开放问题
 → 按价值继续追踪
 → 记录 Evidence
-→ 形成 Observed Behavior
-→ 生成 Candidate CLM
+→ Observed Behavior
+→ Candidate CLM
 → 人或权威规范确认
 → Canonical CLM
 ```
 
-优先追踪：
+优先追踪：业务规则、权限/验证、状态变化、数据读写、事务、一致性、事件、队列、重试、幂等、动态分派和关键外部调用。
 
-- 业务规则与领域服务；
-- 权限、验证和状态变化；
-- 数据读写、事务和一致性；
-- 事件、队列、回调；
-- 重试、幂等、降级；
-- 动态分派、配置和重要外部调用。
+复杂项目按 `references/legacy-workspace.md` 工作；详细规则见 `references/legacy-import.md`。
 
-通常不深入普通日志、getter/setter、简单 DTO 映射和框架内部常规实现。
-
-复杂项目按 `references/legacy-workspace.md` 维护工作区；详细导入原则见 `references/legacy-import.md`。
-
-## 5. 证据等级
+## 6. 证据等级
 
 ```text
 已观察（OBSERVED）  源代码直接证明
 推断（INFERRED）    多个已观察事实组合得到
-假设（ASSUMED）     依赖尚未验证的框架或运行时语义
+假设（ASSUMED）     尚未验证的框架/运行时语义
 未知（UNKNOWN）     当前证据不足
 ```
 
 `ASSUMED / UNKNOWN` 不得静默升级成 canonical rule。
 
-## 6. CLM 语义结构
+## 7. CLM 结构与人类视图
 
-CLM 是带类型的语义图，主要包含：
+CLM 是带类型语义图：
 
 ```text
-领域      Entity / ValueType / Enum / Relationship
-行为      Behavior
-规则      Rule
-判断      Decision
-动作      Action / Foreach
-状态      StateMachine / Transition
-影响      Effect
-约束      Constraint / Invariant
-场景      Scenario
-基础能力  Primitive
+Domain / Behavior / Rule / Decision / Action
+StateMachine / Transition / Effect / Constraint
+Scenario / Primitive
 ```
 
-所有工具必须通过 `scripts/clm_model.py` 使用统一 Node Registry；禁止各脚本自行维护节点集合。
-
-## 7. 人类可读逻辑
-
-需要给人审阅时，从 CLM 投影中文逻辑：
+给人审阅时：
 
 ```bash
-python scripts/render_human_logic.py model.json -o logic.md
+node scripts/logic_cli.mjs render model.json -o logic.md
 ```
 
-投影可以重排和解释，但不能增加 CLM 中不存在的新业务规则。
+自然语言投影只能解释和重排 CLM，不能增加不存在的业务规则。
 
-详细规则见 `references/human-projection.md`。
+详见 `references/human-projection.md`。
 
 ## 8. 修改逻辑
 
 ### 单点修改
 
-简单修改可使用 Semantic Patch：
+使用 Semantic Patch：
 
-```text
-修改一个 Rule 字段
-新增一个枚举成员
-删除一个节点
+```bash
+node scripts/apply_patch.mjs model.json patch.json -o updated.json --diff-output diff.json
 ```
 
-规范见：
-
-- `references/semantic-patch.md`
-- `schemas/semantic-patch-v0.1.schema.json`
-- `scripts/apply_semantic_patch.py`
+详见 `references/semantic-patch.md`。
 
 ### 业务级修改
 
-一个业务修改涉及多个节点时，优先使用 **Semantic Change Set v0.2**。
+涉及多个 Rule / Action / Transition / Scenario / Constraint 时使用 Semantic Change Set v0.2：
 
-```text
-一个变更集
-├─ 修改 Rule
-├─ 增加 Transition
-├─ 增加 Scenario
-└─ 更新 Constraint
+```bash
+node scripts/apply_change_set.mjs model.json change-set.json -o updated.json --diff-output diff.json
 ```
 
-整个变更集必须全部成功或全部失败；重要变更集优先带 `base_model_version + base_semantic_hash`。
+整个变更集必须全部成功或全部失败。重要变更优先带 `base_model_version + base_semantic_hash`。
 
-规范和工具：
+详见 `references/semantic-change-set.md`。
 
-- `references/semantic-change-set.md`
-- `schemas/semantic-change-set-v0.2.schema.json`
-- `scripts/apply_semantic_change_set.py`
-- `scripts/semantic_hash.py`
-
-自由自然语言修改只能先转换成 Patch / Change Set Proposal，再应用。
+自由自然语言只能先转成 Patch / Change Set Proposal，再应用。
 
 ## 9. 修改后的增量处理
 
-逻辑修改后先分析影响，不默认全量重生成：
-
 ```bash
-python scripts/analyze_impact.py model.json <changed-semantic-id...>
+node scripts/analyze_impact.mjs model.json <changed-id...> --output impact.json
 ```
 
-影响结果至少区分：
-
-```text
-直接影响
-传递影响
-需要重生成的派生产物
-需要人工复核的候选影响
-```
+至少区分：直接影响、传递影响、需要重生成的派生产物和需要人工复核的候选影响。
 
 详见 `references/impact-analysis.md`。
 
-## 10. CLM 校验
+## 10. 校验与测试派生
 
-新模型必须经过：
-
-```text
-Schema
-→ Semantic ID / Collection
-→ 引用完整性
-→ Symbol Table
-→ Typed Expression
-→ Typed Action / Scenario
-→ 枚举类型和值
-→ 基础类型兼容
-→ 状态迁移一致性
-→ Evidence 要求
-```
+CLM 校验：
 
 ```bash
-python scripts/validate_clm.py model.json --schema schemas/clm-v0.2.schema.json
+node scripts/logic_cli.mjs validate-clm model.json
 ```
 
-详细错误语义见 `references/clm-validator.md`。
-
-## 11. 测试派生
-
-测试期望直接来自 CLM：
+Symbol Table：
 
 ```bash
-python scripts/generate_test_vectors.py model.json --output tests.json
+node scripts/logic_cli.mjs symbols model.json -o symbols.json
 ```
 
-优先覆盖：
+Semantic Hash：
 
-- Rule 正反例；
-- 数值边界；
-- Scenario；
-- State Transition；
-- Forbidden Transition；
-- Invariant / Property；
-- Temporal Rule。
+```bash
+node scripts/logic_cli.mjs hash model.json
+```
 
-详细规则见 `references/test-vector-generation.md`。
+测试向量：
 
-## 12. 实现投影与目标测试
+```bash
+node scripts/logic_cli.mjs test-vectors model.json -o test-vectors.json
+```
 
-生成链路固定为：
+测试期望必须来自 CLM，优先覆盖 Rule、Scenario、Transition、Invariant 和边界条件。
+
+详见：
+
+- `references/clm-validator.md`
+- `references/test-vector-generation.md`
+
+## 11. IIR v0.2 与 Target Test Plan
+
+固定链路：
 
 ```text
 CLM
 → Target Profile
-→ Primitive Binding
 → IIR v0.2
 → IIR Validation
 → Target Test Plan
@@ -271,12 +229,12 @@ CLM
 ```
 
 ```bash
-python scripts/compile_iir.py model.json target-profile.json -o implementation.iir.json
-python scripts/validate_iir.py implementation.iir.json --schema schemas/iir-v0.2.schema.json
-python scripts/compile_target_tests.py tests.json implementation.iir.json -o target-test-plan.json
+node scripts/logic_cli.mjs compile-iir model.json target-profile.json -o implementation.iir.json
+node scripts/logic_cli.mjs validate-iir implementation.iir.json
+node scripts/logic_cli.mjs target-tests test-vectors.json implementation.iir.json -o target-test-plan.json
 ```
 
-IIR 只负责技术组织，不得改变业务规则。`blocking unresolved` 非空时禁止进入目标代码生成。
+IIR 只做技术组织，不得改变业务规则。blocking unresolved 非空时禁止目标代码生成。
 
 详见：
 
@@ -284,51 +242,50 @@ IIR 只负责技术组织，不得改变业务规则。`blocking unresolved` 非
 - `references/target-test-generation.md`
 - `references/verification-and-generation.md`
 
-### Go 目标生成
+## 12. 首个参考目标：TypeScript + SQLite
 
-当前第一种目标生成器为 Go v0.1：
-
-```bash
-python scripts/generate_go.py implementation.iir.json target-test-plan.json -o generated-go
-python scripts/verify_generated_manifest.py generated-go
-```
-
-Go Generator 只在以下条件满足时执行：
+首个 Reference Target：
 
 ```text
-IIR v0.2 校验通过
-blocking unresolved = 0
-Target Profile language = Go
+TypeScript 5.x
+Node.js
+SQLite
+Vitest
+framework-agnostic
 ```
 
-第一版只生成高度确定的 Use Case、Repository/External Port interface、Typed Error、Manifest 和 testify 测试骨架；第三方 SDK、未绑定 Primitive 和复杂基础设施不得自行猜测。
+目标配置示例：
 
-详见 `references/go-generator-v0.1.md`。
+`evals/fixtures/ts-sqlite.target-profile.json`
 
-## 13. 最小统一流水线
-
-常规流程优先使用：
+生成：
 
 ```bash
-python scripts/run_logic_pipeline.py model.json \
+node scripts/logic_cli.mjs generate-ts implementation.iir.json target-test-plan.json -o generated-ts
+node scripts/logic_cli.mjs verify-manifest generated-ts
+```
+
+第一版只生成高度确定的 Use Case、Repository / External Port interface、Typed Error、SQLite adapter contract、Manifest 和 Vitest 骨架。
+
+SQLite 只是实现层选择，不进入 CLM。
+
+详见 `references/typescript-generator-v0.1.md`。
+
+## 13. 统一流水线
+
+```bash
+node scripts/run_pipeline.mjs model.json \
   --change-set change-set.json \
-  --target-profile target-profile.json
+  --target-profile evals/fixtures/ts-sqlite.target-profile.json \
+  --generate-ts \
+  --output-dir .logic-engineering-output
 ```
 
-需要进入 Go 生成阶段时：
-
-```bash
-python scripts/run_logic_pipeline.py model.json \
-  --target-profile target-profile.json \
-  --generate-go
-```
-
-流水线执行：
+执行顺序：
 
 ```text
-版本识别
-→ Schema + Semantic Validation
-→ 可选语义修改
+CLM Validation
+→ 可选 Patch / Change Set
 → 再次校验
 → Impact Analysis
 → Symbol Table
@@ -337,17 +294,31 @@ python scripts/run_logic_pipeline.py model.json \
 → IIR v0.2
 → IIR Validation
 → Target Test Plan
-→ 可选 Go Generator
-→ Generated Manifest Verification
+→ TypeScript + SQLite Generator
+→ Manifest Verification
 ```
 
-任一步失败都应终止，不继续生成“看起来合理”的后续结果。
+任一步失败都应终止。
 
 详见 `references/end-to-end-pipeline.md`。
 
-## 14. 逻辑优化
+## 14. 回归 Gate
 
-优化只操作 CLM，不直接优化 generated code。
+修改 CLM / IIR / Generator 核心协议后执行：
+
+```bash
+node scripts/run_v02_regression.mjs
+```
+
+或：
+
+```bash
+npm run regression
+```
+
+详见 `references/clm-v0.2-freeze-checklist.md`。
+
+## 15. 逻辑优化
 
 ```text
 O1 归一化       不改变行为
@@ -356,47 +327,17 @@ O3 稳健性改进   事务、幂等、重试、并发等实现语义变化
 O4 业务修改     真正改变业务行为，默认需要人工确认
 ```
 
-重点检查：
+重点检查重复规则、缺失 case、分支重叠、状态机非法路径、不变量冲突、副作用顺序、事务、幂等和并发问题。
 
-- 重复规则；
-- 缺失 case；
-- 分支重叠或不可达；
-- 状态机非法路径；
-- 不变量冲突；
-- 副作用顺序风险；
-- 事务、幂等、并发问题。
+没有充分业务证据时写“潜在问题”，不要把设计偏好当确定 bug。
 
-没有充分业务证据时使用“潜在问题”，不要把设计偏好当确定 bug。
+## 16. 废弃与兼容策略
 
-## 15. 默认产出
-
-根据任务只生成最小充分集合：
-
-```text
-Candidate / Canonical CLM
-中文逻辑视图
-Evidence Map
-Open Questions
-Semantic Patch / Change Set
-Semantic Diff
-Impact Analysis
-Symbol Table
-Test Vectors
-Target Profile / IIR v0.2
-IIR Validation Result
-Target Test Plan
-Generated Manifest（生成目标代码时）
-Verification Result
-```
-
-不要为了形式生成所有文件。
-
-## 16. 废弃资产与兼容策略
-
-- 已被 v0.2 完整替代、且没有迁移价值的说明文档应直接删除，不保留重复主规范。
-- CLM v0.1 的 JSON Schema 与迁移脚本暂时保留，仅用于旧模型兼容与迁移。
-- 新功能不得继续扩展 v0.1；需要新语义时升级 v0.2 或后续版本。
-- 删除规范后必须检查主 Skill、Agent prompt 和 references 是否存在死链。
+- 已被新版本完整替代且没有迁移价值的文档或脚本直接删除。
+- CLM v0.1 schema 暂时保留，只用于旧模型兼容。
+- 新功能不得继续扩展 v0.1。
+- 不同时长期维护 Python / Node 双实现。
+- 删除资产后检查 Skill、Agent prompt 和 references 是否仍有死链。
 
 ## 17. 禁止事项
 
@@ -406,8 +347,8 @@ Verification Result
 - 不在忠实翻译阶段偷偷改业务行为。
 - 不把 generated code 当业务事实源。
 - 不从 generated code 生成 expected tests。
-- 不把框架特有语法直接写入领域规则。
+- 不把框架或 SQLite 细节直接写进领域规则。
 - 不因为文本相似就强行抽公共规则。
-- 不在 `blocking unresolved` 非空时宣称实现完整。
-- 不绕过 IIR Validator 直接调用目标代码生成器。
-- 不宣称“CLM 正确即可自动证明任何生成实现都正确”；必须说明实际验证层级。
+- 不在 blocking unresolved 非空时宣称实现完整。
+- 不绕过 IIR Validator 直接调用目标生成器。
+- 不宣称 CLM 正确即可自动证明任何生成实现都正确；必须说明实际验证层级。
