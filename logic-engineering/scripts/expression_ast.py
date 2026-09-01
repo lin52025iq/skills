@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Set
+from typing import Any, Dict, Iterator, List
 
 
 LOGICAL_OPS = {"all", "any", "not"}
 COMPARISON_OPS = {"eq", "ne", "lt", "le", "gt", "ge", "in", "not_in"}
-VALUE_KINDS = {"ref", "literal", "enum", "null"}
+SCALAR_VALUE_KINDS = {"ref", "literal", "enum", "null"}
+VALUE_KINDS = SCALAR_VALUE_KINDS | {"set"}
 
 
 class ExpressionError(ValueError):
@@ -54,19 +55,22 @@ def validate_expression_shape(expr: Any, path: str = "expression") -> List[str]:
             errors.append(f"{path} 缺少 left")
         if "right" not in expr:
             errors.append(f"{path} 缺少 right")
-        for side in ("left", "right"):
-            if side in expr:
-                errors.extend(validate_value_shape(expr[side], f"{path}.{side}"))
+        if "left" in expr:
+            errors.extend(validate_scalar_value_shape(expr["left"], f"{path}.left"))
+        if "right" in expr:
+            errors.extend(validate_value_shape(expr["right"], f"{path}.right"))
+        if op in {"in", "not_in"} and isinstance(expr.get("right"), dict) and "set" not in expr["right"]:
+            errors.append(f"{path}.right 对于 {op} 应使用 set typed value")
         return errors
 
     return [f"{path}.op 非法或未支持: {op!r}"]
 
 
-def validate_value_shape(value: Any, path: str) -> List[str]:
+def validate_scalar_value_shape(value: Any, path: str) -> List[str]:
     if not isinstance(value, dict):
         return [f"{path} 必须是 typed value 对象"]
-    keys = [k for k in VALUE_KINDS if k in value]
-    if len(keys) != 1:
+    keys = [k for k in SCALAR_VALUE_KINDS if k in value]
+    if len(keys) != 1 or any(k in value for k in VALUE_KINDS - SCALAR_VALUE_KINDS):
         return [f"{path} 必须且只能包含 ref/literal/enum/null 之一"]
     kind = keys[0]
     if kind == "ref" and not isinstance(value["ref"], str):
@@ -80,6 +84,20 @@ def validate_value_shape(value: Any, path: str) -> List[str]:
     return []
 
 
+def validate_value_shape(value: Any, path: str) -> List[str]:
+    if isinstance(value, dict) and "set" in value:
+        if len(value) != 1:
+            return [f"{path}.set 不能与其他 typed value 字段并存"]
+        items = value.get("set")
+        if not isinstance(items, list) or not items:
+            return [f"{path}.set 必须是非空数组"]
+        errors: List[str] = []
+        for i, item in enumerate(items):
+            errors.extend(validate_scalar_value_shape(item, f"{path}.set[{i}]"))
+        return errors
+    return validate_scalar_value_shape(value, path)
+
+
 def humanize_value(value: Dict[str, Any]) -> str:
     if "ref" in value:
         return value["ref"]
@@ -89,6 +107,8 @@ def humanize_value(value: Dict[str, Any]) -> str:
         return str(value["enum"].get("value"))
     if "null" in value:
         return "空值"
+    if "set" in value:
+        return "、".join(humanize_value(item) for item in value.get("set", []))
     return "<?>"
 
 
