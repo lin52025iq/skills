@@ -24,21 +24,22 @@ Target Profile persistence = SQLite
 Target Test Plan 已生成
 ```
 
-## 2. v0.2 相比 v0.1
-
-v0.1 只生成安全骨架；v0.2 开始生成确定性可执行语义：
+## 2. v0.2 可执行语义
 
 ```text
 CLM Enum           → TypeScript string literal union
+Entity cardinality → 标量 / 数组类型
 Typed Expression   → TypeScript boolean expression
 Rule Guard         → 可调用 guard function
 Typed Assignment   → 真实属性赋值
+Decision           → if / else
+Foreach            → for...of + scoped item
 Write/Persist      → 已知 Repository save 调用
 IIR Dependency     → constructor dependency
 Scenario Expect    → Vitest 真实断言
 ```
 
-如果测试 fixture 信息不足，不生成假通过断言，而是输出 `it.todo`。
+测试 fixture 信息不足时输出 `it.todo`，不生成假通过断言。
 
 ## 3. 生成命令
 
@@ -49,13 +50,14 @@ node scripts/generate_typescript_v02.mjs \
   -o generated-ts
 ```
 
-生成后先执行 manifest 校验：
+生成后：
 
 ```bash
 node scripts/logic_cli.mjs verify-manifest generated-ts
+node scripts/validate_generated_typescript.mjs generated-ts
 ```
 
-环境已经具备 TypeScript/Vitest 时，可以进一步执行：
+环境具备 TypeScript/Vitest 时进一步执行：
 
 ```bash
 node scripts/verify_typescript.mjs generated-ts
@@ -67,35 +69,33 @@ IIR `domain_types` 生成：
 
 - Enum → string literal union；
 - Entity → interface；
-- nullable/cardinality 保持类型约束。
+- nullable 保持可空约束；
+- `cardinality=many` → `T[]`。
 
 例如：
 
 ```ts
-export type OrderStatus =
-  | "PENDING_PAYMENT"
-  | "PENDING_ACCEPTANCE"
-  | "PAID"
-  | "CANCELLED";
+export type OrderStatus = "PENDING_PAYMENT" | "CANCELLED";
+
+export interface Order {
+  items: OrderItem[];
+}
 ```
 
-CLM 中文名称只用于显示，不直接作为代码标识符。代码标识符从 Semantic ID 确定性派生。
+代码标识符从 Semantic ID 确定性派生；中文名称只作为显示信息。
 
 ## 5. Runtime Binding
 
-IIR `runtime_bindings` 将：
+IIR `runtime_bindings` 将稳定 Semantic Ref 映射为目标运行时路径，例如：
 
 ```text
 domain.order.status
+→ input.order.status
 ```
 
-映射为用例运行时槽位及字段路径，例如：
+Target Adapter 不重新猜领域对象关系。
 
-```text
-order.status
-```
-
-Target Adapter 只做命名风格转换，不重新猜领域对象关系。
+Foreach scoped ref 不进入全局 runtime binding，而由 IIR Foreach Step 的 `item_alias / item_type` 提供上下文。
 
 ## 6. Guard
 
@@ -113,7 +113,7 @@ any     → ||
 not     → !
 ```
 
-每个 Rule Guard 生成独立函数，方便 Use Case 和测试共同调用。
+每个 Behavior precondition Rule 生成独立 guard function。
 
 ## 7. Use Case
 
@@ -121,20 +121,72 @@ Use Case：
 
 - 输入实体只来自 IIR `input_refs`；
 - 依赖只来自 IIR `dependencies`；
-- guard 顺序保持；
-- action 顺序保持；
+- guard / step 顺序保持；
 - typed assignment 生成真实赋值；
-- 已知 repository effect 生成 Repository 方法调用。
+- repository / port effect 按 IIR dependency 执行。
 
-未知外部语义不得由 Generator 自行补全。
+未知语义不得由 Generator 自行补全。
 
-## 8. SQLite
+## 8. Decision
+
+IIR：
+
+```text
+when
+then_steps
+else_steps
+```
+
+生成：
+
+```ts
+if (condition) {
+  // then_steps
+} else {
+  // else_steps
+}
+```
+
+分支中的 Assignment、Effect、嵌套 Decision/Foreach 递归生成，不能扁平化或漏执行。
+
+## 9. Foreach
+
+IIR：
+
+```text
+collection_ref
+item_alias
+item_type
+when
+do_steps
+```
+
+生成：
+
+```ts
+for (const item of input.order.items) {
+  if (!(item.reserved === true)) continue;
+  item.released = true;
+}
+```
+
+规则：
+
+- collection 必须来自 `cardinality=many` 的 entity field；
+- `item.xxx` 只在循环作用域内解析；
+- `when` 映射为循环过滤条件；
+- `do_steps` 保持顺序并递归生成；
+- scoped item 对应 Repository effect 时，可以直接把局部 item 传给匹配的 Repository contract。
+
+当前暂不支持内层 foreach 的 collection 来自外层 scoped item，例如 `item.children`；IIR 会将其标记为 blocking unresolved，而不是 Generator 猜测。
+
+## 10. SQLite
 
 SQLite 只属于 Target Profile / IIR / Adapter 层。
 
 v0.2 当前生成 SQLite adapter boundary 与 TODO，不在缺少明确 persistence mapping 时猜表名、列名或 SQL。
 
-## 9. Target Test
+## 11. Target Test
 
 Target Test Plan 区分：
 
@@ -144,21 +196,13 @@ Scenario Use Case Case
 Unsupported Case
 ```
 
-Rule Case 调用真实生成 guard 并断言结果。
+Rule Case 调用真实 guard。
 
-Scenario Case 根据：
+Scenario Case根据 CLM Given、IIR runtime bindings 与 guard fixture constraints 构造技术 fixture。
 
-- CLM Given；
-- IIR runtime bindings；
-- guard fixture constraints；
+当前结构化 Scenario 主要覆盖标量字段；foreach 集合对象场景将在结构化集合 fixture 协议加入后转为可执行测试。在此之前，不伪造集合业务对象。
 
-构造技术测试 fixture。等值约束可以生成相同测试哨兵值；这属于测试装配，不改变业务期望。
-
-缺少可安全构造的信息时生成 `it.todo`，禁止 `expect(true)` 伪通过。
-
-## 10. Generated Project
-
-生成目录至少包含：
+## 12. Generated Project
 
 ```text
 domain/generated.ts
@@ -173,29 +217,24 @@ tsconfig.json
 manifest.json
 ```
 
-## 11. 执行 Gate
+## 13. 生成质量 Gate
 
-`verify_typescript.mjs`：
+`validate_generated_typescript.mjs` 零依赖检查：
 
-1. 检查必要生成文件；
-2. 查找本地或全局 `tsc`；
-3. 执行 TypeScript typecheck；
-4. 查找本地或全局 `vitest`；
-5. 执行 Vitest。
+- 禁止 skeleton throw；
+- 禁止 `expect(true)`；
+- 禁止 unresolved Semantic Ref 动态访问；
+- 必要 generated files 必须存在。
 
-如果工具未安装，显式返回 `TOOL_UNAVAILABLE`，不得把跳过描述成通过。
+`verify_typescript.mjs` 在环境具备工具时执行：
 
-## 12. Generated Code Integrity
+1. `tsc --noEmit`；
+2. `vitest run`。
 
-Manifest 保存：
+工具不存在返回 `TOOL_UNAVAILABLE`，不把跳过描述成通过。
 
-- generator version；
-- source CLM；
-- source semantic hash；
-- IIR version；
-- Target Profile；
-- artifact path；
-- semantic refs；
-- content hash。
+## 14. Generated Code Integrity
+
+Manifest 保存 generator version、source CLM、semantic hash、IIR version、Target Profile、artifact path、semantic refs 与 content hash。
 
 业务修改必须回到 CLM / Semantic Change Set；直接修改 generated code 会由 manifest drift 检测发现。
