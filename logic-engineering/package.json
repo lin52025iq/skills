@@ -1,0 +1,12 @@
+{
+  "name": "logic-engineering-skill-tools",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "validate": "node scripts/validate_clm.mjs",
+    "regression": "node scripts/run_v02_regression.mjs"
+  }
+}
