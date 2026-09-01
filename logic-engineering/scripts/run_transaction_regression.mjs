@@ -23,26 +23,27 @@ checks.push(run('generate_typescript_transactions.mjs',[path.join(out,'iir.json'
 checks.push(run('logic_cli.mjs',['verify-manifest',path.join(out,'generated-ts')],'Atomicity Manifest'));
 checks.push(run('validate_generated_typescript.mjs',[path.join(out,'generated-ts')],'Atomicity TS Quality'));
 
-let planOk=false,wrapperOk=false,runnerOk=false,manifestOk=false,tsconfigOk=false,entrypointOk=false,scopedFactory=false;
+let planOk=false,wrapperOk=false,runnerOk=false,manifestOk=false,tsconfigOk=false,entrypointOk=false,compositionOk=false;
 try{
   const iir=readJson(path.join(out,'iir.json')).iir,uc=iir.use_cases?.[0],plan=iir.transaction_plans?.[0];
   planOk=plan?.behavior_ref==='behavior.order.cancel_atomic'&&plan?.boundary_valid===true&&plan?.start_index===0&&plan?.end_index===1&&uc?.transaction_plan_ids?.[0]===plan.id;
   const tx=fs.readFileSync(path.join(out,'generated-ts','transactions','generated.ts'),'utf8');
   wrapperOk=tx.includes('class TransactionalOrderCancelAtomicUseCase')&&tx.includes('this.transactions.transaction(async (executor) =>')&&tx.includes('const inner = this.createInner(executor)')&&tx.includes('await inner.execute(input)');
-  scopedFactory=tx.includes('type OrderCancelAtomicUseCaseFactory = (executor: SqliteExecutor)')&&tx.includes('requires_transaction_scoped_factory')===false;
-  runnerOk=tx.includes('class DefaultSqliteTransactionRunner')&&tx.includes('BEGIN IMMEDIATE')&&tx.includes('COMMIT')&&tx.includes('ROLLBACK')&&tx.includes('work(this.db)')&&tx.includes("import type { SqliteExecutor }");
+  runnerOk=tx.includes('class DefaultSqliteTransactionRunner')&&tx.includes('BEGIN IMMEDIATE')&&tx.includes('COMMIT')&&tx.includes('ROLLBACK')&&tx.includes('work(this.db)');
+  const composition=fs.readFileSync(path.join(out,'generated-ts','composition','generated.ts'),'utf8');
+  compositionOk=composition.includes('function createTransactionalOrderCancelAtomicUseCase')&&composition.includes('new OrderSqliteRepository(executor)')&&composition.includes('new OrderCancelAtomicUseCase(')&&composition.includes('new DefaultSqliteTransactionRunner(db)');
   const manifest=readJson(path.join(out,'generated-ts','manifest.json'));
-  manifestOk=manifest.generator_layers?.includes('typescript-transaction-v0.3')&&manifest.artifacts?.some(x=>x.path==='transactions/generated.ts')&&manifest.artifacts?.some(x=>x.path==='tests/generated.transaction.test.ts');
-  entrypointOk=manifest.implementation_entrypoints?.some(x=>x.implementation_id===uc.id&&x.export_name==='TransactionalOrderCancelAtomicUseCase'&&x.transaction_plan_id===plan.id&&x.artifact==='transactions/generated.ts'&&x.requires_transaction_scoped_factory===true);
-  const tsconfig=readJson(path.join(out,'generated-ts','tsconfig.json'));tsconfigOk=tsconfig.include?.includes('transactions/**/*.ts');
+  manifestOk=manifest.generator_layers?.includes('typescript-transaction-v0.4')&&manifest.artifacts?.some(x=>x.path==='transactions/generated.ts')&&manifest.artifacts?.some(x=>x.path==='composition/generated.ts')&&manifest.artifacts?.some(x=>x.path==='tests/generated.transaction.test.ts');
+  entrypointOk=manifest.implementation_entrypoints?.some(x=>x.implementation_id===uc.id&&x.export_name==='createTransactionalOrderCancelAtomicUseCase'&&x.transaction_plan_id===plan.id&&x.artifact==='composition/generated.ts'&&x.fully_composed===true);
+  const tsconfig=readJson(path.join(out,'generated-ts','tsconfig.json'));tsconfigOk=tsconfig.include?.includes('transactions/**/*.ts')&&tsconfig.include?.includes('composition/**/*.ts');
 }catch{}
 checks.push(check('IIR transaction plan 精确绑定行为',planOk));
-checks.push(check('生成 transactional use case wrapper',wrapperOk));
-checks.push(check('事务 wrapper 使用 transaction-scoped factory',scopedFactory));
+checks.push(check('生成 transaction-scoped use case wrapper',wrapperOk));
 checks.push(check('生成 BEGIN/COMMIT/ROLLBACK Transaction Runner',runnerOk));
+checks.push(check('自动组合事务内 SQLite Repository',compositionOk));
 checks.push(check('事务层写入 manifest',manifestOk));
-checks.push(check('事务 Use Case 正式入口指向 wrapper',entrypointOk));
-checks.push(check('事务层纳入 tsconfig',tsconfigOk));
+checks.push(check('正式入口切换到 fully composed factory',entrypointOk));
+checks.push(check('事务与 composition 纳入 tsconfig',tsconfigOk));
 
 const neg=path.join(tmp,'negative');fs.mkdirSync(neg,{recursive:true});
 checks.push(run('schema_validate.mjs',[partial,path.join(SCHEMAS,'clm-v0.2.schema.json')],'Partial Atomicity CLM Schema'));
