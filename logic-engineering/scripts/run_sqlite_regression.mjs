@@ -14,7 +14,7 @@ checks.push(run('schema_validate.mjs',[profile,path.join(SCHEMAS,'target-profile
 checks.push(run('logic_cli.mjs',['test-vectors',model,'-o',path.join(tmp,'tests.json')],'生成测试向量'));
 checks.push(run('compile_iir.mjs',[model,profile,'-o',path.join(tmp,'iir.json')],'编译 SQLite IIR'));
 checks.push(run('schema_validate.mjs',[path.join(tmp,'iir.json'),path.join(SCHEMAS,'iir-v0.2.schema.json')],'SQLite IIR Schema'));
-checks.push(run('logic_cli.mjs',['validate-iir',path.join(tmp,'iir.json')],'SQLite IIR Semantic'));
+checks.push(run('validate_iir.mjs',[path.join(tmp,'iir.json')],'SQLite IIR Semantic'));
 checks.push(run('compile_target_tests.mjs',[path.join(tmp,'tests.json'),path.join(tmp,'iir.json'),'-o',path.join(tmp,'target-tests.json')],'编译 Target Test Plan'));
 checks.push(run('generate_typescript_v02.mjs',[path.join(tmp,'iir.json'),path.join(tmp,'target-tests.json'),'-o',path.join(tmp,'generated-ts')],'生成 SQLite Adapter'));
 checks.push(run('validate_generated_typescript.mjs',[path.join(tmp,'generated-ts')],'生成质量 Gate'));
