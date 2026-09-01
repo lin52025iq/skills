@@ -11,6 +11,7 @@
     "regression:core": "node scripts/run_v02_regression.mjs",
     "regression:sqlite": "node scripts/run_sqlite_regression.mjs",
     "regression:sqlite-negative": "node scripts/run_sqlite_mapping_negative.mjs",
-    "regression": "npm run regression:core && npm run regression:sqlite && npm run regression:sqlite-negative"
+    "regression:transaction": "node scripts/run_transaction_regression.mjs",
+    "regression": "npm run regression:core && npm run regression:sqlite && npm run regression:sqlite-negative && npm run regression:transaction"
   }
 }
