@@ -22,6 +22,21 @@ function validate(document){
     }
   }
 
+  const plans=new Map((root.transaction_plans??[]).map(x=>[x.id,x]));
+  for(const uc of root.use_cases??[]){
+    for(const planId of uc.transaction_plan_ids??[]){
+      const plan=plans.get(planId);
+      if(!plan){errors.push({code:'IIR_TRANSACTION_PLAN_MISSING',message:`${uc.id} 引用不存在的 transaction plan: ${planId}`});continue;}
+      if(plan.behavior_ref&&!(uc.semantic_refs??[]).includes(plan.behavior_ref))errors.push({code:'IIR_TRANSACTION_BEHAVIOR_MISMATCH',message:`${plan.id} behavior_ref 与 ${uc.id} 不匹配`});
+      if(plan.boundary_valid!==true)errors.push({code:'IIR_TRANSACTION_BOUNDARY_INVALID',message:`${plan.id} 事务边界无效`});
+      if(!plan.strategy)errors.push({code:'IIR_TRANSACTION_STRATEGY_MISSING',message:`${plan.id} 缺少 transaction strategy`});
+      if(root.target_profile?.transaction_scope==='full_behavior'){
+        const flow=(uc.steps??[]).map(x=>x.semantic_ref),members=plan.members??[];
+        if(flow.length!==members.length||flow.some((x,i)=>x!==members[i]))errors.push({code:'IIR_TRANSACTION_SCOPE_UNSUPPORTED',message:`${plan.id} 未完整覆盖 ${uc.id} flow，当前目标只支持 full_behavior`});
+      }
+    }
+  }
+
   for(const item of root.unresolved??[]){
     if(isBlocking(item))errors.push({code:'IIR_BLOCKING_UNRESOLVED',message:typeof item==='string'?item:item.semantic_ref??item.reason});
     else warnings.push({code:'IIR_UNRESOLVED_WARNING',message:item?.semantic_ref??item?.reason});
