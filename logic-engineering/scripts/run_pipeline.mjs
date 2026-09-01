@@ -21,6 +21,7 @@ run('logic_cli.mjs',['test-vectors',working,'-o',path.join(out,'test-vectors.jso
 let generated=null;
 if(profile){
   const iir=path.join(out,'implementation.iir.json'),targetTests=path.join(out,'target-test-plan.json');
+  run('schema_validate.mjs',[profile,path.join(SCHEMAS,'target-profile-v0.1.schema.json')],'校验 Target Profile Schema');
   run('compile_iir.mjs',[working,profile,'-o',iir],'编译 IIR v0.2');
   run('schema_validate.mjs',[iir,path.join(SCHEMAS,'iir-v0.2.schema.json')],'校验 IIR Schema');
   run('logic_cli.mjs',['validate-iir',iir],'校验 IIR Semantic');
