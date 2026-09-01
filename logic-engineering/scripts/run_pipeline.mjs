@@ -29,6 +29,7 @@ if(profile){
   if(has('--generate-ts',args)){
     generated=path.join(out,'generated-ts');
     run('generate_typescript_v02.mjs',[iir,targetTests,'-o',generated],'生成 TypeScript + SQLite v0.2');
+    run('generate_typescript_transactions.mjs',[iir,generated],'生成 TypeScript 事务层');
     run('logic_cli.mjs',['verify-manifest',generated],'校验生成产物完整性');
     run('validate_generated_typescript.mjs',[generated],'校验 TypeScript 生成质量');
     if(has('--verify-ts',args))run('verify_typescript.mjs',[generated],'执行 TypeScript/Vitest Gate');
