@@ -1,0 +1,57 @@
+{
+  "suite": "typescript-generator-v0.2",
+  "cases": [
+    {
+      "id": "ts.generator.requires-valid-iir",
+      "expect": [
+        "IIR blocking unresolved 非空时拒绝生成",
+        "Target Profile language 不是 TypeScript 时拒绝生成",
+        "Target Profile persistence 不是 SQLite 时拒绝首个 Reference Target 生成"
+      ]
+    },
+    {
+      "id": "ts.generator.domain-types",
+      "expect": [
+        "CLM enum 通过 IIR domain_types 生成 TypeScript string literal union",
+        "CLM entity 生成 TypeScript interface",
+        "中文 display_name 不直接作为代码标识符，代码名从 Semantic ID 确定性派生"
+      ]
+    },
+    {
+      "id": "ts.generator.executable-guards",
+      "expect": [
+        "Typed Expression 生成真实 TypeScript boolean expression",
+        "in/not_in 使用 includes 语义",
+        "Use Case 在 steps 前调用 guard",
+        "guard 失败抛出稳定 GuardViolationError"
+      ]
+    },
+    {
+      "id": "ts.generator.assignment-and-effects",
+      "expect": [
+        "Typed Assignment 生成真实属性赋值",
+        "write/persist effect 能映射到已知 Repository save",
+        "Repository dependency 通过 constructor 注入",
+        "未知外部语义不由 Generator 自行补全"
+      ]
+    },
+    {
+      "id": "ts.generator.real-tests",
+      "expect": [
+        "Rule Vector 调用生成 guard 并使用真实 toBe 断言",
+        "Scenario Vector 调用生成 Use Case 并断言 CLM expected state",
+        "fixture 可由等值 guard constraint 生成技术哨兵值",
+        "信息不足时生成 it.todo，不允许 expect(true) 假通过"
+      ]
+    },
+    {
+      "id": "ts.generator.manifest-and-gates",
+      "expect": [
+        "manifest 保存 source semantic hash 和 artifact content hash",
+        "verify-manifest 可检测 generated file drift",
+        "verify_typescript.mjs 在 tsc/vitest 可用时执行 typecheck 与测试",
+        "工具不存在时返回 TOOL_UNAVAILABLE 而不是宣称通过"
+      ]
+    }
+  ]
+}
