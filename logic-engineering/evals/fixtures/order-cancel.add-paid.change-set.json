@@ -1,0 +1,48 @@
+{
+  "change_set_id": "change.order.cancel.allow-paid",
+  "intent": "允许已支付订单取消，并补充对应示例场景",
+  "source": "user_request",
+  "behavior_change_level": "O4_BUSINESS_CHANGE",
+  "base_model_version": "0.2",
+  "operations": [
+    {
+      "operation_id": "op.allowed-status.add-paid",
+      "operation": "UPDATE_FIELD",
+      "target_semantic_id": "rule.order.cancel.allowed_status",
+      "field_path": "expression.right.set",
+      "before": [
+        { "enum": { "type": "domain.order_status", "value": "PENDING_PAYMENT" } },
+        { "enum": { "type": "domain.order_status", "value": "PENDING_ACCEPTANCE" } }
+      ],
+      "after": [
+        { "enum": { "type": "domain.order_status", "value": "PENDING_PAYMENT" } },
+        { "enum": { "type": "domain.order_status", "value": "PENDING_ACCEPTANCE" } },
+        { "enum": { "type": "domain.order_status", "value": "PAID" } }
+      ]
+    },
+    {
+      "operation_id": "op.scenario.add-paid",
+      "operation": "ADD_NODE",
+      "collection": "scenarios",
+      "after": {
+        "id": "scenario.order.cancel.paid",
+        "kind": "scenario",
+        "name": "取消已支付订单",
+        "given": [
+          {
+            "target": { "ref": "domain.order.status" },
+            "value": { "enum": { "type": "domain.order_status", "value": "PAID" } }
+          }
+        ],
+        "when": ["behavior.order.cancel"],
+        "then": [
+          {
+            "target": { "ref": "domain.order.status" },
+            "value": { "enum": { "type": "domain.order_status", "value": "CANCELLED" } }
+          }
+        ]
+      }
+    }
+  ],
+  "verification_required": ["schema", "type_check", "semantic_consistency", "scenario_tests", "human_confirmation"]
+}
