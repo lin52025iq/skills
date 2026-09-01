@@ -40,9 +40,8 @@ function validateObjectValue(objectValue,symbols,errors,owner,location,scope){
     const field=symbols[fieldRef];
     if(!field||field.kind!=='field'||field.owner!==type){errors.push({code:'INVALID_OBJECT_FIELD',semantic_id:owner,path:`${location}.fields.${fieldRef}`,message:`字段不属于 ${type}: ${fieldRef}`});continue;}
     const actual=validateTypedValue(value,symbols,errors,owner,`${location}.fields.${fieldRef}`,scope);
-    if(field.cardinality==='many'){
-      if(actual.cardinality!=='many')errors.push({code:'COLLECTION_FIELD_REQUIRES_LIST',semantic_id:owner,path:`${location}.fields.${fieldRef}`,message:`${fieldRef} 是 many 字段，值必须为 list`});
-    }else if(actual.cardinality==='many')errors.push({code:'SCALAR_FIELD_REJECTS_LIST',semantic_id:owner,path:`${location}.fields.${fieldRef}`,message:`${fieldRef} 是标量字段，不能赋 list`});
+    if(field.cardinality==='many'&&actual.cardinality!=='many')errors.push({code:'COLLECTION_FIELD_REQUIRES_LIST',semantic_id:owner,path:`${location}.fields.${fieldRef}`,message:`${fieldRef} 是 many 字段，值必须为 list`});
+    if(field.cardinality!=='many'&&actual.cardinality==='many')errors.push({code:'SCALAR_FIELD_REJECTS_LIST',semantic_id:owner,path:`${location}.fields.${fieldRef}`,message:`${fieldRef} 是标量字段，不能赋 list`});
     if(actual.type&&!compatibleTypes(field.type,actual.type))errors.push({code:'TYPE_MISMATCH',semantic_id:owner,path:`${location}.fields.${fieldRef}`,message:`${fieldRef} 期望 ${field.type}，实际 ${actual.type}`});
   }
   const required=Object.values(symbols).filter(x=>x.kind==='field'&&x.owner===type&&x.nullable!==true);
@@ -108,6 +107,17 @@ function validateAtomicity(node,index,errors){
   const start=Math.min(...positions),end=Math.max(...positions),expected=flow.slice(start,end+1);
   if(expected.length!==members.length||expected.some((x,i)=>x!==members[i]))errors.push({code:'NON_CONTIGUOUS_ATOMICITY',semantic_id:node.id,path:'members',message:'atomicity.members 必须按 Behavior flow 顺序形成连续区间'});
 }
+function validateExternalCall(node,symbols,errors){
+  const names=new Set();
+  for(let i=0;i<(node.arguments??[]).length;i++){
+    const arg=node.arguments[i];
+    if(names.has(arg.name))errors.push({code:'DUPLICATE_EXTERNAL_ARGUMENT',semantic_id:node.id,path:`arguments[${i}].name`,message:`外部调用参数名重复: ${arg.name}`});
+    names.add(arg.name);
+    const d=validateTypedValue(arg.value,symbols,errors,node.id,`arguments[${i}].value`,null);
+    if(d.cardinality==='many'&&!Array.isArray(arg.value?.list))errors.push({code:'EXTERNAL_ARGUMENT_COLLECTION_REQUIRES_LIST',semantic_id:node.id,path:`arguments[${i}].value`,message:'外部调用集合参数必须使用 typed list'});
+    for(const ref of refsIn(arg.value))if(ref.startsWith('item.'))errors.push({code:'EXTERNAL_ARGUMENT_SCOPED_REF_UNSUPPORTED',semantic_id:node.id,path:`arguments[${i}].value`,message:'独立 external_call Effect 暂不允许引用 foreach item scope'});
+  }
+}
 
 function validateClm(document){
   const root=rootOf(document),errors=[],warnings=[],ids=new Set(),symbols=buildSymbolTable(document),index=buildNodeIndex(document);
@@ -129,6 +139,7 @@ function validateClm(document){
       if(!(node.do??[]).length)warnings.push({code:'EMPTY_FOREACH_BODY',semantic_id:node.id,message:'foreach do 为空，不会产生行为'});
     }
     if(node.kind==='atomicity')validateAtomicity(node,index,errors);
+    if(node.kind==='external_call')validateExternalCall(node,symbols,errors);
     if(node.kind==='scenario'){
       for(const section of ['given','then'])for(let i=0;i<(node[section]??[]).length;i++){
         const a=node[section][i];if(!a?.target||!a?.value)continue;
