@@ -15,6 +15,7 @@
         "kind": "entity",
         "name": "订单",
         "fields": [
+          { "id": "domain.order.id", "type": "string", "nullable": false },
           { "id": "domain.order.status", "type": "domain.order_status", "nullable": false },
           { "id": "domain.order.owner_id", "type": "string", "nullable": false }
         ]
