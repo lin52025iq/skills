@@ -1,0 +1,128 @@
+{
+  "clm": {
+    "id": "module.order_items",
+    "version": "0.2",
+    "name": "订单明细模块",
+    "domain": [
+      {
+        "id": "domain.order_item",
+        "kind": "entity",
+        "name": "订单明细",
+        "fields": [
+          { "id": "domain.order_item.reserved", "type": "boolean", "nullable": false },
+          { "id": "domain.order_item.released", "type": "boolean", "nullable": false }
+        ]
+      },
+      {
+        "id": "domain.order",
+        "kind": "entity",
+        "name": "订单",
+        "fields": [
+          { "id": "domain.order.items", "type": "domain.order_item", "nullable": false, "cardinality": "many" }
+        ]
+      }
+    ],
+    "behaviors": [
+      {
+        "id": "behavior.order.release_reserved_items",
+        "kind": "behavior",
+        "name": "释放已预留明细",
+        "flow": ["action.order.foreach_reserved_items"]
+      }
+    ],
+    "rules": [],
+    "decisions": [],
+    "actions": [
+      {
+        "id": "action.order.foreach_reserved_items",
+        "kind": "foreach",
+        "name": "遍历已预留明细",
+        "collection": { "ref": "domain.order.items" },
+        "item": "item",
+        "when": {
+          "op": "eq",
+          "left": { "ref": "item.reserved" },
+          "right": { "literal": true }
+        },
+        "do": ["action.order.release_item"]
+      },
+      {
+        "id": "action.order.release_item",
+        "kind": "action",
+        "name": "标记明细已释放",
+        "operation": "assign",
+        "target": { "ref": "item.released" },
+        "value": { "literal": true },
+        "effects": []
+      }
+    ],
+    "states": [],
+    "effects": [],
+    "constraints": [],
+    "scenarios": [
+      {
+        "id": "scenario.order.release_reserved_items",
+        "kind": "scenario",
+        "name": "只释放已预留明细",
+        "given": [
+          {
+            "target": { "ref": "domain.order.items" },
+            "value": {
+              "list": [
+                {
+                  "object": {
+                    "type": "domain.order_item",
+                    "fields": {
+                      "domain.order_item.reserved": { "literal": true },
+                      "domain.order_item.released": { "literal": false }
+                    }
+                  }
+                },
+                {
+                  "object": {
+                    "type": "domain.order_item",
+                    "fields": {
+                      "domain.order_item.reserved": { "literal": false },
+                      "domain.order_item.released": { "literal": false }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "when": ["behavior.order.release_reserved_items"],
+        "then": [
+          {
+            "target": { "ref": "domain.order.items" },
+            "value": {
+              "list": [
+                {
+                  "object": {
+                    "type": "domain.order_item",
+                    "fields": {
+                      "domain.order_item.reserved": { "literal": true },
+                      "domain.order_item.released": { "literal": true }
+                    }
+                  }
+                },
+                {
+                  "object": {
+                    "type": "domain.order_item",
+                    "fields": {
+                      "domain.order_item.reserved": { "literal": false },
+                      "domain.order_item.released": { "literal": false }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "primitives": [],
+    "relations": [],
+    "evidence": []
+  }
+}

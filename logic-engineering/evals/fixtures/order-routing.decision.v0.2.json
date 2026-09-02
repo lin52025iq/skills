@@ -1,0 +1,113 @@
+{
+  "clm": {
+    "id": "module.order_routing",
+    "version": "0.2",
+    "name": "订单路由模块",
+    "domain": [
+      {
+        "id": "domain.order_priority",
+        "kind": "enum",
+        "name": "订单优先级",
+        "values": ["NORMAL", "VIP"]
+      },
+      {
+        "id": "domain.handling_mode",
+        "kind": "enum",
+        "name": "处理模式",
+        "values": ["STANDARD", "FAST"]
+      },
+      {
+        "id": "domain.order",
+        "kind": "entity",
+        "name": "订单",
+        "fields": [
+          { "id": "domain.order.priority", "type": "domain.order_priority", "nullable": false },
+          { "id": "domain.order.handling_mode", "type": "domain.handling_mode", "nullable": false }
+        ]
+      }
+    ],
+    "behaviors": [
+      {
+        "id": "behavior.order.route",
+        "kind": "behavior",
+        "name": "选择订单处理模式",
+        "preconditions": [],
+        "flow": ["decision.order.route.by_priority"],
+        "postconditions": []
+      }
+    ],
+    "rules": [],
+    "decisions": [
+      {
+        "id": "decision.order.route.by_priority",
+        "kind": "decision",
+        "name": "按优先级选择处理方式",
+        "when": {
+          "op": "eq",
+          "left": { "ref": "domain.order.priority" },
+          "right": { "enum": { "type": "domain.order_priority", "value": "VIP" } }
+        },
+        "then": ["action.order.route.fast"],
+        "else": ["action.order.route.standard"]
+      }
+    ],
+    "actions": [
+      {
+        "id": "action.order.route.fast",
+        "kind": "action",
+        "operation": "assign",
+        "target": { "ref": "domain.order.handling_mode" },
+        "value": { "enum": { "type": "domain.handling_mode", "value": "FAST" } },
+        "effects": ["effect.order.handling_mode_write"]
+      },
+      {
+        "id": "action.order.route.standard",
+        "kind": "action",
+        "operation": "assign",
+        "target": { "ref": "domain.order.handling_mode" },
+        "value": { "enum": { "type": "domain.handling_mode", "value": "STANDARD" } },
+        "effects": ["effect.order.handling_mode_write"]
+      }
+    ],
+    "states": [],
+    "effects": [
+      {
+        "id": "effect.order.handling_mode_write",
+        "kind": "write",
+        "resource": "domain.order.handling_mode"
+      }
+    ],
+    "constraints": [],
+    "scenarios": [
+      {
+        "id": "scenario.order.route.vip",
+        "kind": "scenario",
+        "name": "VIP 订单走快速处理",
+        "given": [
+          { "target": { "ref": "domain.order.priority" }, "value": { "enum": { "type": "domain.order_priority", "value": "VIP" } } },
+          { "target": { "ref": "domain.order.handling_mode" }, "value": { "enum": { "type": "domain.handling_mode", "value": "STANDARD" } } }
+        ],
+        "when": ["behavior.order.route"],
+        "then": [
+          { "target": { "ref": "domain.order.handling_mode" }, "value": { "enum": { "type": "domain.handling_mode", "value": "FAST" } } }
+        ]
+      },
+      {
+        "id": "scenario.order.route.normal",
+        "kind": "scenario",
+        "name": "普通订单走标准处理",
+        "given": [
+          { "target": { "ref": "domain.order.priority" }, "value": { "enum": { "type": "domain.order_priority", "value": "NORMAL" } } },
+          { "target": { "ref": "domain.order.handling_mode" }, "value": { "enum": { "type": "domain.handling_mode", "value": "FAST" } } }
+        ],
+        "when": ["behavior.order.route"],
+        "then": [
+          { "target": { "ref": "domain.order.handling_mode" }, "value": { "enum": { "type": "domain.handling_mode", "value": "STANDARD" } } }
+        ]
+      }
+    ],
+    "primitives": [],
+    "relations": [],
+    "evidence": []
+  }
+}

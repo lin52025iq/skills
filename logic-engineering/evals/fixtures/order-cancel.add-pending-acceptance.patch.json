@@ -1,0 +1,23 @@
+{
+  "semantic_patch": {
+    "patch_id": "patch.order.cancel.allow_pending_acceptance",
+    "intent": "待接单订单也允许取消",
+    "target_semantic_id": "rule.order.cancel.allowed_status",
+    "operation": "ADD_MEMBER",
+    "field_path": "value",
+    "value": "PENDING_ACCEPTANCE",
+    "reason": "业务规则允许待接单订单进入取消流程",
+    "behavior_change_level": "O4",
+    "affected_semantic_nodes": [
+      "behavior.order.cancel",
+      "state_machine.order",
+      "scenario.order.cancel.pending_payment"
+    ],
+    "verification_required": [
+      "schema",
+      "semantic",
+      "scenario",
+      "state_transition"
+    ]
+  }
+}

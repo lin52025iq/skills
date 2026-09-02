@@ -1,0 +1,149 @@
+{
+  "skill": "logic-engineering",
+  "suite": "clm-validator-v0.1",
+  "cases": [
+    {
+      "id": "validator-valid-order-cancel",
+      "input": "使用 schemas/clm-v0.1.schema.json 和 scripts/validate_clm.py 校验 evals/fixtures/order-cancel.valid.json。",
+      "expect": [
+        "结构校验通过",
+        "不存在 DUPLICATE_SEMANTIC_ID",
+        "不存在 BROKEN_REFERENCE",
+        "不存在 INVALID_CONDITION",
+        "最终 valid=true"
+      ]
+    },
+    {
+      "id": "validator-empty-all-condition",
+      "input": "校验 evals/fixtures/order-cancel.invalid.json。该样例包含空 all 条件。",
+      "expect": [
+        "最终 valid=false",
+        "至少报告 SCHEMA_VALIDATION_ERROR 或 INVALID_CONDITION",
+        "不能把空 all 当成恒真条件接受"
+      ]
+    },
+    {
+      "id": "validator-broken-reference",
+      "input_model": {
+        "clm": {
+          "id": "module.demo",
+          "version": 1,
+          "behaviors": [
+            {
+              "id": "behavior.demo.run",
+              "kind": "behavior",
+              "name": "执行演示",
+              "status": "candidate",
+              "origin": "user_defined",
+              "confidence": "high",
+              "flow": ["action.demo.missing"]
+            }
+          ],
+          "domain": [],
+          "rules": [],
+          "actions": [],
+          "decisions": [],
+          "states": [],
+          "effects": [],
+          "constraints": [],
+          "scenarios": [],
+          "primitives": [],
+          "relations": [],
+          "evidence": []
+        }
+      },
+      "expect": [
+        "valid=false",
+        "错误码包含 BROKEN_REFERENCE",
+        "错误定位到 behavior.demo.run.flow"
+      ]
+    },
+    {
+      "id": "validator-observed-without-evidence",
+      "input_model": {
+        "clm": {
+          "id": "module.demo",
+          "version": 1,
+          "rules": [
+            {
+              "id": "rule.demo.enabled",
+              "kind": "rule",
+              "name": "功能已启用",
+              "status": "candidate",
+              "origin": "observed",
+              "confidence": "high",
+              "condition": {
+                "op": "eq",
+                "left": {"ref": "domain.feature.enabled"},
+                "right": {"literal": true}
+              }
+            }
+          ],
+          "domain": [],
+          "behaviors": [],
+          "actions": [],
+          "decisions": [],
+          "states": [],
+          "effects": [],
+          "constraints": [],
+          "scenarios": [],
+          "primitives": [],
+          "relations": [],
+          "evidence": []
+        }
+      },
+      "expect": [
+        "valid=false",
+        "错误码包含 MISSING_EVIDENCE"
+      ]
+    },
+    {
+      "id": "validator-nondeterministic-transition",
+      "input_model": {
+        "clm": {
+          "id": "module.order",
+          "version": 1,
+          "states": [
+            {
+              "id": "transition.order.paid.cancelled",
+              "kind": "transition",
+              "name": "已支付到已取消",
+              "status": "candidate",
+              "origin": "user_defined",
+              "confidence": "high",
+              "from": "PAID",
+              "to": "CANCELLED",
+              "trigger": "behavior.order.cancel"
+            },
+            {
+              "id": "transition.order.paid.refunded",
+              "kind": "transition",
+              "name": "已支付到已退款",
+              "status": "candidate",
+              "origin": "user_defined",
+              "confidence": "high",
+              "from": "PAID",
+              "to": "REFUNDED",
+              "trigger": "behavior.order.cancel"
+            }
+          ],
+          "domain": [],
+          "behaviors": [],
+          "rules": [],
+          "actions": [],
+          "decisions": [],
+          "effects": [],
+          "constraints": [],
+          "scenarios": [],
+          "primitives": [],
+          "relations": [],
+          "evidence": []
+        }
+      },
+      "expect": [
+        "valid=false",
+        "错误码包含 NON_DETERMINISTIC_TRANSITION"
+      ]
+    }
+  ]
+}

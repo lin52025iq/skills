@@ -1,0 +1,96 @@
+{
+  "skill": "logic-engineering",
+  "version": "0.2",
+  "cases": [
+    {
+      "id": "import-module-logic",
+      "prompt": "请分析订单模块中的取消订单功能，把代码级实现转换成与编程语言无关、普通人可以读懂的逻辑说明，并标出哪些是代码直接证明、哪些是推断、哪些仍未知。",
+      "expected": [
+        "不能只总结当前文件，必须继续追踪会影响取消订单行为的关键依赖",
+        "输出人类可读逻辑，并区分已观察、推断、假设、未知",
+        "识别前置条件、状态变化、副作用、失败路径",
+        "形成候选逻辑模型而不是直接声称为规范业务逻辑"
+      ]
+    },
+    {
+      "id": "normalize-conditions",
+      "prompt": "把该模块里分散的用户身份判断、订单归属判断和状态判断整理成更容易理解的逻辑结构，但不要改变现有行为。",
+      "expected": [
+        "按无损归一化处理",
+        "可以把相关判断进行语义分组或形成决策表",
+        "不能擅自新增、删除或调整业务条件",
+        "保留与原始代码的证据映射"
+      ]
+    },
+    {
+      "id": "extract-common-rule",
+      "prompt": "取消订单、修改订单、删除订单都有一段类似的用户权限判断，请看看能不能提成公共逻辑。",
+      "expected": [
+        "不能只根据文本或代码相似度决定抽取",
+        "需要比较领域含义、前后条件、副作用和未来变更耦合",
+        "先生成公共逻辑提取提案或 Semantic Change Set",
+        "不能直接修改生成代码"
+      ]
+    },
+    {
+      "id": "business-change-patch",
+      "prompt": "待接单的订单以后也允许取消。",
+      "expected": [
+        "识别这是业务行为修改",
+        "定位对应规则语义 ID",
+        "生成语义补丁提案，展示修改前后和影响范围",
+        "不能把自由自然语言直接静默写入规范模型"
+      ]
+    },
+    {
+      "id": "cross-language-generation",
+      "prompt": "现在已有确认过的取消订单逻辑，请把它实现成 TypeScript + Node.js + SQLite，业务行为保持不变。",
+      "expected": [
+        "以 CLM 为事实源，而不是逐行翻译旧语言代码",
+        "先形成 ts-sqlite Target Profile 和 IIR v0.2",
+        "SQLite 只属于实现层，不进入 CLM",
+        "从 CLM 独立派生 Test Vector 和 Vitest 目标测试计划",
+        "blocking unresolved 非空时停止生成"
+      ]
+    },
+    {
+      "id": "detect-state-gap",
+      "prompt": "代码里已发货订单仍然能走取消流程，但业务上我们认为发货后不应该取消。请整理。",
+      "expected": [
+        "分别保存已观察行为和期望逻辑",
+        "把差异标记为行为差异或潜在缺陷",
+        "形成禁止状态迁移或对应约束的修改提案",
+        "不能在导入阶段直接覆盖旧行为事实"
+      ]
+    },
+    {
+      "id": "generated-tests-source",
+      "prompt": "根据刚生成的 TypeScript 代码再反推一套测试，确保行为一致。",
+      "expected": [
+        "拒绝从 generated code 反推 expected behavior",
+        "测试期望应来自 CLM Test Vector",
+        "测试装配由 IIR + Target Profile 决定",
+        "首个目标测试使用 Vitest"
+      ]
+    },
+    {
+      "id": "dynamic-dispatch",
+      "prompt": "支付逻辑调用的是 PaymentProcessor 接口，请直接告诉我最终会走哪个实现。",
+      "expected": [
+        "不能仅根据接口或命名猜测最终实现",
+        "继续检查工厂、依赖注入、配置或注册机制",
+        "无法确认时标记为高概率或未解析动态关系"
+      ]
+    },
+    {
+      "id": "node-toolchain",
+      "prompt": "运行 logic-engineering 的校验和完整流水线。",
+      "expected": [
+        "使用 Node.js 20+ 工具链",
+        "主路径不依赖 Python",
+        "使用 logic_cli.mjs / run_pipeline.mjs / run_v02_regression.mjs",
+        "不恢复已经删除的 Python 双实现"
+      ]
+    }
+  ]
+}

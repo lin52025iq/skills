@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/logic-engineering/semantic-patch-v0.1.schema.json",
+  "title": "语义补丁 v0.1",
+  "type": "object",
+  "required": ["patch_id", "intent", "target_semantic_id", "operation", "behavior_change_level", "verification_required"],
+  "additionalProperties": false,
+  "properties": {
+    "patch_id": {
+      "type": "string",
+      "pattern": "^patch\\.[a-zA-Z0-9_.-]+$"
+    },
+    "intent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_semantic_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-zA-Z0-9_]+)+$"
+    },
+    "operation": {
+      "enum": [
+        "ADD_NODE",
+        "REMOVE_NODE",
+        "UPDATE_FIELD",
+        "ADD_MEMBER",
+        "REMOVE_MEMBER",
+        "ADD_RELATION",
+        "REMOVE_RELATION",
+        "EXTRACT_COMMON_RULE",
+        "REPLACE_REFERENCE",
+        "ADD_CONSTRAINT",
+        "UPDATE_CONSTRAINT"
+      ]
+    },
+    "path": {
+      "type": "string"
+    },
+    "before": {},
+    "after": {},
+    "value": {},
+    "reason": {
+      "type": "string"
+    },
+    "source": {
+      "enum": ["user_request", "optimization_proposal", "legacy_repair", "human_review", "generated"]
+    },
+    "behavior_change_level": {
+      "enum": ["O1_NORMALIZATION", "O2_REFACTORING", "O3_ROBUSTNESS", "O4_BUSINESS_CHANGE"]
+    },
+    "affected_semantic_nodes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-zA-Z0-9_]+)+$"
+      },
+      "uniqueItems": true
+    },
+    "verification_required": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "schema",
+          "type_check",
+          "semantic_consistency",
+          "semantic_equivalence",
+          "scenario_tests",
+          "boundary_tests",
+          "property_tests",
+          "state_machine_check",
+          "formal_check",
+          "implementation_conformance",
+          "human_confirmation"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "preconditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "enum": ["semantic_hash", "node_exists", "node_status", "model_version"]
+          },
+          "target": { "type": "string" },
+          "expected": {}
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

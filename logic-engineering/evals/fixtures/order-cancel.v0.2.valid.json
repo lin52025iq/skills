@@ -1,0 +1,125 @@
+{
+  "clm": {
+    "id": "module.order",
+    "version": "0.2",
+    "name": "订单模块",
+    "domain": [
+      {
+        "id": "domain.order_status",
+        "kind": "enum",
+        "name": "订单状态",
+        "values": ["PENDING_PAYMENT", "PENDING_ACCEPTANCE", "PAID", "CANCELLED"]
+      },
+      {
+        "id": "domain.order",
+        "kind": "entity",
+        "name": "订单",
+        "fields": [
+          { "id": "domain.order.id", "type": "string", "nullable": false },
+          { "id": "domain.order.status", "type": "domain.order_status", "nullable": false },
+          { "id": "domain.order.owner_id", "type": "string", "nullable": false }
+        ]
+      },
+      {
+        "id": "domain.current_user",
+        "kind": "entity",
+        "name": "当前用户",
+        "fields": [
+          { "id": "domain.current_user.id", "type": "string", "nullable": false }
+        ]
+      }
+    ],
+    "behaviors": [
+      {
+        "id": "behavior.order.cancel",
+        "kind": "behavior",
+        "name": "取消订单",
+        "preconditions": ["rule.order.cancel.owner", "rule.order.cancel.allowed_status"],
+        "flow": ["action.order.cancel.change_status"],
+        "postconditions": ["invariant.order.cancelled"]
+      }
+    ],
+    "rules": [
+      {
+        "id": "rule.order.cancel.owner",
+        "kind": "rule",
+        "name": "订单归属校验",
+        "expression": {
+          "op": "eq",
+          "left": { "ref": "domain.order.owner_id" },
+          "right": { "ref": "domain.current_user.id" }
+        }
+      },
+      {
+        "id": "rule.order.cancel.allowed_status",
+        "kind": "rule",
+        "name": "允许取消的订单状态",
+        "expression": {
+          "op": "in",
+          "left": { "ref": "domain.order.status" },
+          "right": {
+            "set": [
+              { "enum": { "type": "domain.order_status", "value": "PENDING_PAYMENT" } },
+              { "enum": { "type": "domain.order_status", "value": "PENDING_ACCEPTANCE" } }
+            ]
+          }
+        }
+      }
+    ],
+    "decisions": [],
+    "actions": [
+      {
+        "id": "action.order.cancel.change_status",
+        "kind": "action",
+        "name": "修改订单状态",
+        "operation": "assign",
+        "target": { "ref": "domain.order.status" },
+        "value": { "enum": { "type": "domain.order_status", "value": "CANCELLED" } },
+        "effects": ["effect.order.status_write"]
+      }
+    ],
+    "states": [],
+    "effects": [
+      {
+        "id": "effect.order.status_write",
+        "kind": "write",
+        "resource": "domain.order.status"
+      }
+    ],
+    "constraints": [
+      {
+        "id": "invariant.order.cancelled",
+        "kind": "invariant",
+        "name": "取消完成后订单必须处于已取消状态",
+        "expression": {
+          "op": "eq",
+          "left": { "ref": "domain.order.status" },
+          "right": { "enum": { "type": "domain.order_status", "value": "CANCELLED" } }
+        }
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "scenario.order.cancel.pending_payment",
+        "kind": "scenario",
+        "name": "取消待支付订单",
+        "given": [
+          {
+            "target": { "ref": "domain.order.status" },
+            "value": { "enum": { "type": "domain.order_status", "value": "PENDING_PAYMENT" } }
+          }
+        ],
+        "when": ["behavior.order.cancel"],
+        "then": [
+          {
+            "target": { "ref": "domain.order.status" },
+            "value": { "enum": { "type": "domain.order_status", "value": "CANCELLED" } }
+          }
+        ]
+      }
+    ],
+    "primitives": [],
+    "relations": [],
+    "evidence": []
+  }
+}

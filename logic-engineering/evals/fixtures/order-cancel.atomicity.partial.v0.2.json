@@ -1,0 +1,70 @@
+{
+  "clm": {
+    "id": "module.order.atomicity.partial",
+    "version": "0.2",
+    "name": "订单取消部分事务负例",
+    "domain": [
+      {
+        "id": "domain.order_status",
+        "kind": "enum",
+        "values": ["PENDING", "CANCELLING", "CANCELLED"]
+      },
+      {
+        "id": "domain.order",
+        "kind": "entity",
+        "fields": [
+          {"id": "domain.order.id", "type": "string", "nullable": false},
+          {"id": "domain.order.status", "type": "domain.order_status", "nullable": false},
+          {"id": "domain.order.owner_id", "type": "string", "nullable": false}
+        ]
+      }
+    ],
+    "behaviors": [
+      {
+        "id": "behavior.order.cancel_atomic_partial",
+        "kind": "behavior",
+        "flow": [
+          "action.order.cancel.mark_cancelling_partial",
+          "action.order.cancel.mark_cancelled_partial"
+        ]
+      }
+    ],
+    "rules": [],
+    "decisions": [],
+    "actions": [
+      {
+        "id": "action.order.cancel.mark_cancelling_partial",
+        "kind": "action",
+        "operation": "assign",
+        "target": {"ref": "domain.order.status"},
+        "value": {"enum": {"type": "domain.order_status", "value": "CANCELLING"}},
+        "effects": ["effect.order.cancel.save_cancelling_partial"]
+      },
+      {
+        "id": "action.order.cancel.mark_cancelled_partial",
+        "kind": "action",
+        "operation": "assign",
+        "target": {"ref": "domain.order.status"},
+        "value": {"enum": {"type": "domain.order_status", "value": "CANCELLED"}},
+        "effects": ["effect.order.cancel.save_cancelled_partial"]
+      }
+    ],
+    "states": [],
+    "effects": [
+      {"id": "effect.order.cancel.save_cancelling_partial", "kind": "write", "resource": "domain.order.status"},
+      {"id": "effect.order.cancel.save_cancelled_partial", "kind": "write", "resource": "domain.order.status"}
+    ],
+    "constraints": [
+      {
+        "id": "constraint.order.cancel.atomic_partial",
+        "kind": "atomicity",
+        "behavior_ref": "behavior.order.cancel_atomic_partial",
+        "members": ["action.order.cancel.mark_cancelling_partial"]
+      }
+    ],
+    "scenarios": [],
+    "primitives": [],
+    "relations": [],
+    "evidence": []
+  }
+}

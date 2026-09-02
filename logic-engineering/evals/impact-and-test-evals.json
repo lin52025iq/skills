@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "impact-rule-to-behavior",
+      "description": "修改订单取消允许状态规则后，应识别引用该规则的行为及派生产物",
+      "clm": "fixtures/order-cancel.valid.json",
+      "changed": ["rule.order.cancel.allowed_status"],
+      "expect": {
+        "affected_contains": ["behavior.order.cancel"],
+        "derived_contains": ["human_projection", "scenario_tests", "target_iir", "generated_code"],
+        "revalidation_contains": ["clm_validator", "scenario_consistency"]
+      }
+    },
+    {
+      "id": "test-vectors-rule-members",
+      "description": "IN 枚举规则应为允许值生成正例，并在能找到枚举全集时生成反例",
+      "clm": "fixtures/order-cancel.valid.json",
+      "source_semantic_id": "rule.order.cancel.allowed_status",
+      "expect": {
+        "kind_contains": ["rule_positive"],
+        "minimum_vectors": 2
+      }
+    },
+    {
+      "id": "test-vectors-scenario",
+      "description": "Scenario 应直接生成 Given/When/Then 示例测试向量",
+      "clm": "fixtures/order-cancel.valid.json",
+      "source_semantic_id": "scenario.order.cancel.pending_payment",
+      "expect": {
+        "kind": "scenario"
+      }
+    },
+    {
+      "id": "patch-impact-regeneration",
+      "description": "新增待接单允许取消后，流水线应生成 updated CLM、语义差异、影响分析、中文逻辑和新测试向量",
+      "clm": "fixtures/order-cancel.valid.json",
+      "patch": "fixtures/order-cancel.add-pending-acceptance.patch.json",
+      "target_profile": "fixtures/go-postgres.target-profile.json",
+      "expect_outputs": [
+        "updated.clm.json",
+        "semantic-diff.json",
+        "impact-analysis.json",
+        "human-logic.md",
+        "test-vectors.json",
+        "implementation.iir.json"
+      ]
+    }
+  ]
+}

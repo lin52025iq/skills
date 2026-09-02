@@ -1,0 +1,47 @@
+{
+  "suite": "iir-v0.2",
+  "cases": [
+    {
+      "id": "iir-order-cancel-compile",
+      "input": "evals/fixtures/order-cancel.v0.2.valid.json",
+      "target_profile": "evals/fixtures/ts-sqlite.target-profile.json",
+      "expect": [
+        "IIR version = 0.2",
+        "存在 behavior.order.cancel 对应 Use Case",
+        "effect.order.status_write 形成 Repository Contract",
+        "Use Case dependency 指向该 Repository Contract",
+        "target_profile.persistence = SQLite",
+        "存在 source_semantic_hash",
+        "blocking unresolved = 0"
+      ]
+    },
+    {
+      "id": "iir-validation",
+      "expect": [
+        "schemas/iir-v0.2.schema.json 结构 Gate 通过",
+        "node scripts/logic_cli.mjs validate-iir 校验通过",
+        "所有 Use Case 存在 traceability",
+        "所有 dependency 指向已定义 Repository 或 External Port"
+      ]
+    },
+    {
+      "id": "target-test-plan",
+      "expect": [
+        "Target Test Plan 的业务期望来自 test-vectors.json",
+        "Scenario 可以定位对应 Use Case",
+        "fake_dependencies 来源于 IIR dependency",
+        "目标测试框架为 Vitest",
+        "unsupported 项不会被静默当成已完成测试"
+      ]
+    },
+    {
+      "id": "blocking-unresolved",
+      "setup": "构造无法满足必要 transaction/concurrency/primitive binding 的 TypeScript/SQLite 目标配置",
+      "expect": [
+        "IIR unresolved 中出现 blocking 项",
+        "Node IIR Validator 返回失败",
+        "统一流水线停止，不进入 TypeScript 目标代码生成"
+      ]
+    }
+  ]
+}

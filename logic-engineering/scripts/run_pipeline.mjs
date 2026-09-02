@@ -1,0 +1,39 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {readJson,rootOf} from './lib/model.mjs';
+const DIR=path.dirname(new URL(import.meta.url).pathname),ROOT=path.resolve(DIR,'..'),SCHEMAS=path.join(ROOT,'schemas');
+function arg(name,args){const i=args.indexOf(name);return i>=0?args[i+1]:null}
+function has(name,args){return args.includes(name)}
+function run(script,args,label){const p=spawnSync(process.execPath,[path.join(DIR,script),...args],{encoding:'utf8'});if(p.status!==0){console.error(JSON.stringify({ok:false,stage:label,stdout:p.stdout,stderr:p.stderr},null,2));process.exit(p.status??1)}if(p.stdout?.trim())console.log(`[${label}]\n${p.stdout.trim()}`)}
+function clmSchema(file){const v=String(rootOf(readJson(file)).version??'0.1');return path.join(SCHEMAS,v==='0.2'?'clm-v0.2.schema.json':'clm-v0.1.schema.json')}
+function validateClm(file,label){run('schema_validate.mjs',[file,clmSchema(file)],`${label} Schema`);run('validate_clm.mjs',[file],`${label} Semantic`)}
+const [model,...args]=process.argv.slice(2);if(!model){console.error('usage: node run_pipeline.mjs model.json [--patch p.json | --change-set c.json] [--target-profile profile.json] [--generate-ts] [--verify-ts] [--output-dir dir]');process.exit(2)}
+const out=arg('--output-dir',args)??'.logic-engineering-output',patch=arg('--patch',args),change=arg('--change-set',args),profile=arg('--target-profile',args);if(patch&&change){console.error('--patch 与 --change-set 不能同时使用');process.exit(2)}
+fs.mkdirSync(out,{recursive:true});let working=model;validateClm(working,'校验原始 CLM');let changed=[];
+if(change){const updated=path.join(out,'updated.clm.json'),diff=path.join(out,'semantic-diff.json');run('apply_change_set.mjs',[working,change,'-o',updated,'--diff-output',diff],'应用语义变更集');working=updated;changed=readJson(diff).changed_semantic_ids??[];validateClm(working,'校验更新后的 CLM')}
+else if(patch){const payload=readJson(patch),p=payload.semantic_patch??payload,target=p.target_semantic_id;if(!target){console.error('Patch 缺少 target_semantic_id');process.exit(2)}const updated=path.join(out,'updated.clm.json');run('apply_patch.mjs',[working,patch,'-o',updated,'--diff-output',path.join(out,'semantic-diff.json')],'应用语义补丁');working=updated;changed=[target];validateClm(working,'校验更新后的 CLM')}
+if(changed.length)run('analyze_impact.mjs',[working,...changed,'--output',path.join(out,'impact-analysis.json')],'分析语义影响');
+run('logic_cli.mjs',['symbols',working,'-o',path.join(out,'symbol-table.json')],'生成 Symbol Table');
+run('logic_cli.mjs',['render',working,'-o',path.join(out,'human-logic.md')],'生成中文逻辑投影');
+run('logic_cli.mjs',['test-vectors',working,'-o',path.join(out,'test-vectors.json')],'生成测试向量');
+let generated=null;
+if(profile){
+  const iir=path.join(out,'implementation.iir.json'),targetTests=path.join(out,'target-test-plan.json');
+  run('schema_validate.mjs',[profile,path.join(SCHEMAS,'target-profile-v0.1.schema.json')],'校验 Target Profile Schema');
+  run('compile_iir.mjs',[working,profile,'-o',iir],'编译 IIR v0.2');
+  run('schema_validate.mjs',[iir,path.join(SCHEMAS,'iir-v0.2.schema.json')],'校验 IIR Schema');
+  run('validate_iir.mjs',[iir],'校验 IIR Semantic');
+  run('compile_target_tests.mjs',[path.join(out,'test-vectors.json'),iir,'-o',targetTests],'编译目标测试计划');
+  if(has('--generate-ts',args)){
+    generated=path.join(out,'generated-ts');
+    run('generate_typescript_v02.mjs',[iir,targetTests,'-o',generated],'生成 TypeScript + SQLite v0.2');
+    run('generate_typescript_transactions.mjs',[iir,generated],'生成 TypeScript 事务层');
+    run('logic_cli.mjs',['verify-manifest',generated],'校验生成产物完整性');
+    run('validate_generated_typescript.mjs',[generated],'校验 TypeScript 生成质量');
+    run('validate_generated_entrypoints.mjs',[iir,generated],'校验生成实现正式入口');
+    if(has('--verify-ts',args))run('verify_typescript.mjs',[generated],'执行 TypeScript/Vitest Gate');
+  }
+}else if(has('--generate-ts',args)||has('--verify-ts',args)){console.error('--generate-ts/--verify-ts 需要 --target-profile');process.exit(2)}
+console.log(JSON.stringify({ok:true,clm:working,output_dir:out,generated_typescript:generated},null,2));

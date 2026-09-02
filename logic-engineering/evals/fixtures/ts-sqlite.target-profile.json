@@ -1,0 +1,29 @@
+{
+  "target_profile": {
+    "id": "ts-sqlite",
+    "language": "TypeScript",
+    "version": "5.x",
+    "runtime": "Node.js",
+    "framework": "framework-agnostic",
+    "architecture": "Clean Architecture",
+    "persistence": "SQLite",
+    "persistence_generation": "explicit_mapping",
+    "persistence_mappings": {
+      "domain.order": {
+        "table": "orders",
+        "primary_key": "domain.order.id",
+        "columns": {
+          "domain.order.id": "id",
+          "domain.order.status": "status",
+          "domain.order.owner_id": "owner_id"
+        }
+      }
+    },
+    "messaging": "none",
+    "transaction_strategy": "sqlite_transaction",
+    "transaction_scope": "full_behavior",
+    "error_model": "typed_errors",
+    "test_framework": "Vitest",
+    "binding_key": "ts-sqlite"
+  }
+}

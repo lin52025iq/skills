@@ -1,0 +1,66 @@
+{
+  "suite": "transaction-v0.2",
+  "cases": [
+    {
+      "id": "atomicity-full-behavior",
+      "input": "evals/fixtures/order-cancel.atomicity.v0.2.json",
+      "target_profile": "evals/fixtures/ts-sqlite.target-profile.json",
+      "expect": [
+        "Atomicity 声明 behavior_ref 与有序 members",
+        "CLM Validator 校验 members 属于目标 Behavior flow 且连续",
+        "IIR transaction plan 保存 behavior_ref、start_index、end_index、boundary_valid",
+        "Use Case 保存 transaction_plan_ids",
+        "Target Profile transaction_scope=full_behavior 时 members 必须完整覆盖 Behavior flow"
+      ]
+    },
+    {
+      "id": "transaction-scoped-executor",
+      "expect": [
+        "SqliteTransactionRunner callback 接收 transaction-scoped SqliteExecutor",
+        "DefaultSqliteTransactionRunner 成功执行 BEGIN IMMEDIATE → work(executor) → COMMIT",
+        "失败执行 BEGIN IMMEDIATE → work throws → ROLLBACK",
+        "Transactional Use Case 不接受预构造 inner，而接受 transaction-scoped factory",
+        "factory 必须在事务 callback 内用 executor 重建 Repository/Use Case"
+      ]
+    },
+    {
+      "id": "automatic-composition",
+      "expect": [
+        "Use Case 依赖全部为生成 SQLite Repository 时生成 composition/generated.ts",
+        "composition factory 使用 callback executor 构造 Repository",
+        "composition factory 再构造 Base Use Case 与 Transactional wrapper",
+        "manifest fully_composed=true",
+        "正式 implementation entrypoint 指向 composition factory"
+      ]
+    },
+    {
+      "id": "manual-composition-boundary",
+      "expect": [
+        "存在未绑定 External Port 时不猜 adapter",
+        "Transactional wrapper 可以保留",
+        "manifest.manual_composition 记录未解析依赖",
+        "正式入口要求 requires_transaction_scoped_factory=true"
+      ]
+    },
+    {
+      "id": "generated-entrypoint-gate",
+      "expect": [
+        "validate_generated_entrypoints.mjs 对照 IIR transaction_plan_ids 与 manifest",
+        "事务 Use Case 不得指向 Base Use Case",
+        "fully composed 入口必须来自 composition/generated.ts",
+        "manifest export_name 必须真实存在于对应 artifact"
+      ]
+    },
+    {
+      "id": "partial-atomicity-rejected",
+      "input": "evals/fixtures/order-cancel.atomicity.partial.v0.2.json",
+      "expect": [
+        "CLM 可以表达连续的部分 Atomicity 区间",
+        "IIR 可以记录该区间",
+        "当前 Target Profile 仅支持 full_behavior",
+        "IIR Validator 返回 IIR_TRANSACTION_SCOPE_UNSUPPORTED",
+        "不得扩大事务范围后静默生成"
+      ]
+    }
+  ]
+}

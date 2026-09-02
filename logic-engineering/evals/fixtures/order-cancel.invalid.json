@@ -1,0 +1,33 @@
+{
+  "clm": {
+    "schema_version": "0.1",
+    "id": "module.order",
+    "name": "订单模块",
+    "status": "canonical",
+    "domain": [],
+    "rules": [
+      {
+        "id": "rule.order.cancel.allowed_status",
+        "kind": "rule",
+        "name": "允许取消的订单状态",
+        "status": "canonical",
+        "origin": "intended",
+        "confidence": "high",
+        "condition": {
+          "op": "all",
+          "items": []
+        }
+      }
+    ],
+    "behaviors": [],
+    "actions": [],
+    "decisions": [],
+    "state_machines": [],
+    "effects": [],
+    "constraints": [],
+    "scenarios": [],
+    "primitives": [],
+    "relations": [],
+    "evidence": []
+  }
+}
